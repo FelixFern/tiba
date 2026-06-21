@@ -1,0 +1,71 @@
+{
+  "timestamp": "2025-06-21T00:00:00Z",
+  "summary": {
+    "tests_total": 16,
+    "tests_passed": 16,
+    "tests_failed": 0,
+    "coverage_functions": 100,
+    "coverage_lines": 100,
+    "coverage_statements": 100
+  },
+  "functions": {
+    "haversine": {
+      "covered": true,
+      "tests": 4,
+      "accuracy_test_jakarta_manggarai": {
+        "expected": "9064m ±50m",
+        "actual": 9064.32,
+        "passed": true
+      },
+      "accuracy_test_bogor_nambo": {
+        "expected": "15752m ±100m",
+        "actual": 15751.66,
+        "passed": true
+      }
+    },
+    "equirectangular": {
+      "covered": true,
+      "tests": 3,
+      "short_distance_error": {
+        "max_allowed": "1%",
+        "actual": "0.15%",
+        "passed": true
+      }
+    },
+    "findNearestStations": {
+      "covered": true,
+      "tests": 6,
+      "scenarios": [
+        "limit=1 returns nearest station",
+        "limit=5 returns 5 stations sorted by distance",
+        "correct nearest to Bogor",
+        "respects limit parameter",
+        "handles limit > array length",
+        "includes distance in results"
+      ]
+    },
+    "edge_cases": {
+      "covered": true,
+      "tests": 3,
+      "scenarios": [
+        "coordinates at equator",
+        "coordinates at prime meridian",
+        "negative coordinates"
+      ]
+    }
+  },
+  "requirements_met": {
+    "lib_distance_ts_created": true,
+    "haversine_function": true,
+    "equirectangular_function": true,
+    "findNearestStations_function": true,
+    "tests_distance_test_ts": true,
+    "tests_count_ge_4": true,
+    "jakarta_manggarai_distance": true,
+    "bogor_nambo_distance": true,
+    "equirectangular_error_lt_1_percent": true,
+    "findNearestStations_correct": true,
+    "coverage_ge_95_percent": true,
+    "no_external_libraries": true
+  }
+}

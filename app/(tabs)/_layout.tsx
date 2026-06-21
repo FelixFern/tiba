@@ -1,6 +1,17 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet, Text } from 'react-native';
+import { type ColorValue, StyleSheet, Text } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { colors, fonts } from '../../lib/theme';
+import { useTabBounce } from '../../lib/animations';
+
+function TabIcon({ icon, color, focused }: { icon: string; color: ColorValue; focused: boolean }) {
+  const bounceStyle = useTabBounce(focused);
+  return (
+    <Animated.View style={bounceStyle}>
+      <Text style={{ fontSize: 20, color }}>{icon}</Text>
+    </Animated.View>
+  );
+}
 
 export default function TabsLayout() {
   return (
@@ -17,21 +28,21 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'NOW',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>●</Text>,
+          tabBarIcon: ({ color, focused }) => <TabIcon icon="●" color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="alarm"
         options={{
           title: 'ALARM',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>◎</Text>,
+          tabBarIcon: ({ color, focused }) => <TabIcon icon="◎" color={color} focused={focused} />,
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: 'SETTINGS',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⚙</Text>,
+          tabBarIcon: ({ color, focused }) => <TabIcon icon="⚙" color={color} focused={focused} />,
         }}
       />
     </Tabs>

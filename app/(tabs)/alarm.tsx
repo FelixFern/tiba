@@ -1,5 +1,6 @@
 import { useMemo, useCallback, useState } from 'react';
 import { View, Text, StyleSheet, SectionList, Pressable, TextInput } from 'react-native';
+import Animated from 'react-native-reanimated';
 import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
 import { colors, fonts, spacing, fontSize, borderColors } from '../../lib/theme';
@@ -9,7 +10,24 @@ import {
   startBackgroundTracking,
   stopBackgroundTracking,
 } from '../../lib/background-location';
+import { useScaleEntrance, useSpringPress, useSlideTransition } from '../../lib/animations';
 import type { Station } from '../../lib/types';
+
+function StationRow({ item, isSelected, onSelect }: { item: Station; isSelected: boolean; onSelect: (s: Station) => void }) {
+  const checkStyle = useScaleEntrance(isSelected);
+  const { animatedStyle: rowPressStyle, onPressIn, onPressOut } = useSpringPress(0.98);
+
+  return (
+    <Animated.View style={rowPressStyle}>
+      <Pressable onPress={() => onSelect(item)} onPressIn={onPressIn} onPressOut={onPressOut} style={styles.stationRow}>
+        <Text style={styles.stationName}>{item.name}</Text>
+        <Animated.View style={checkStyle}>
+          {isSelected && <Text style={styles.checkmark}>✓</Text>}
+        </Animated.View>
+      </Pressable>
+    </Animated.View>
+  );
+}
 
 export default function AlarmScreen() {
   const destination = useTibaStore((s) => s.destination);
@@ -73,6 +91,8 @@ export default function AlarmScreen() {
     router.push('/(tabs)');
   }, []);
 
+  const cardSlideStyle = useSlideTransition(!!destination, { from: 'bottom', distance: 20, duration: 280 });
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -96,7 +116,7 @@ export default function AlarmScreen() {
 
       {/* Destination Card */}
       {destination && (
-        <View style={styles.destinationCard}>
+        <Animated.View style={[styles.destinationCard, cardSlideStyle]}>
           <Text style={styles.destinationLabel}>DESTINATION</Text>
           <View style={styles.destinationContent}>
             <View style={styles.destinationInfo}>
@@ -122,7 +142,7 @@ export default function AlarmScreen() {
               <Text style={styles.clearButtonText}>✕</Text>
             </Pressable>
           </View>
-        </View>
+        </Animated.View>
       )}
 
       {/* Threshold Section */}
@@ -171,18 +191,9 @@ export default function AlarmScreen() {
             </Text>
           </View>
         )}
-        renderItem={({ item }) => {
-          const isSelected = item.id === destination?.id;
-          return (
-            <Pressable
-              onPress={() => handleSelectStation(item)}
-              style={styles.stationRow}
-            >
-              <Text style={styles.stationName}>{item.name}</Text>
-              {isSelected && <Text style={styles.checkmark}>✓</Text>}
-            </Pressable>
-          );
-        }}
+        renderItem={({ item }) => (
+          <StationRow item={item} isSelected={item.id === destination?.id} onSelect={handleSelectStation} />
+        )}
       />
 
       {/* CTA Button */}

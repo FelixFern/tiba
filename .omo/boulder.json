@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "active_work_id": "ui-revamp-001",
+  "works": {
+    "ui-revamp-001": {
+      "work_id": "ui-revamp-001",
+      "active_plan": ".omo/plans/ui-revamp.md",
+      "plan_name": "ui-revamp",
+      "session_ids": ["opencode:ui-revamp-exec"],
+      "status": "active",
+      "started_at": "2026-06-21T18:00:00.000Z",
+      "updated_at": "2026-06-21T18:00:00.000Z",
+      "worktree_path": null
+    }
+  }
+}

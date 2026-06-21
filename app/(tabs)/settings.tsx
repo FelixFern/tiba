@@ -5,14 +5,43 @@ import { useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { storage, useTibaStore } from '../../lib/store';
 import { badgeColors, borderColors, colors, fontSize, fonts, spacing } from '../../lib/theme';
+import { useSpringPress } from '../../lib/animations';
+
+function AnimatedButton({
+  onPress,
+  disabled,
+  style,
+  children,
+}: {
+  onPress: () => void;
+  disabled?: boolean;
+  style?: object;
+  children: React.ReactNode;
+}) {
+  const { animatedStyle, onPressIn, onPressOut } = useSpringPress(0.95);
+  return (
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        disabled={disabled}
+        style={style}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+}
 
 export default function SettingsScreen() {
   const [locationStatus, setLocationStatus] = useState<'granted' | 'denied'>('denied');
@@ -114,9 +143,9 @@ export default function SettingsScreen() {
           {locationStatus === 'granted' ? (
             <Text style={styles.grantedBadge}>● GRANTED</Text>
           ) : (
-            <TouchableOpacity onPress={handleRequestLocation} disabled={isLoading}>
+            <AnimatedButton onPress={handleRequestLocation} disabled={isLoading}>
               <Text style={styles.enableButton}>ENABLE</Text>
-            </TouchableOpacity>
+            </AnimatedButton>
           )}
         </View>
       </View>
@@ -131,9 +160,9 @@ export default function SettingsScreen() {
           {notificationStatus === 'granted' ? (
             <Text style={styles.grantedBadge}>● GRANTED</Text>
           ) : (
-            <TouchableOpacity onPress={handleRequestNotification} disabled={isLoading}>
+            <AnimatedButton onPress={handleRequestNotification} disabled={isLoading}>
               <Text style={styles.enableButton}>ENABLE</Text>
-            </TouchableOpacity>
+            </AnimatedButton>
           )}
         </View>
       </View>
@@ -145,9 +174,9 @@ export default function SettingsScreen() {
           <Text style={styles.permissionDescription}>Improves station accuracy</Text>
         </View>
         <View style={styles.permissionRight}>
-          <TouchableOpacity onPress={handlePreciseLocation}>
+          <AnimatedButton onPress={handlePreciseLocation}>
             <Text style={styles.enableButton}>■ ENABLE</Text>
-          </TouchableOpacity>
+          </AnimatedButton>
         </View>
       </View>
 
@@ -174,9 +203,9 @@ export default function SettingsScreen() {
       </View>
 
       {/* CLEAR DATA ACTION */}
-      <TouchableOpacity style={styles.clearDataAction} onPress={handleClearData}>
+      <AnimatedButton onPress={handleClearData} style={styles.clearDataAction}>
         <Text style={styles.clearDataText}>CLEAR SAVED TRIP DATA</Text>
-      </TouchableOpacity>
+      </AnimatedButton>
     </ScrollView>
   );
 }

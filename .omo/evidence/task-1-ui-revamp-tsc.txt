@@ -1,0 +1,4 @@
+T1 Verification: lib/theme.ts extended with spacing, borderColors, badgeColors, fontSize
+TSC: pre-existing errors only (bun:test, @types/node) — no new errors from theme changes
+Exports verified: colors, lineColors, fonts (unchanged), spacing, borderColors, badgeColors, fontSize (new)
+File grew from 21 to 53 lines. All values match design spec.

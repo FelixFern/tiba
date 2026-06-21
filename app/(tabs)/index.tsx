@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { useAnimatedCounter, usePulse, useSpringPress, useSlideTransition } from '../../lib/animations';
 import { colors, fonts, spacing, fontSize, borderColors, badgeColors } from '../../lib/theme';
 import { useTibaStore } from '../../lib/store';
 import {
@@ -60,17 +62,24 @@ export default function HomeScreen() {
     return { text: '● Alarm armed', color: badgeColors.tracking };
   }, [computedStationsRemaining, alarmThreshold]);
 
+  const { animatedStyle: counterAnimStyle } = useAnimatedCounter(computedStationsRemaining);
+  const pulseStyle = usePulse(true);
+  const { animatedStyle: startPressStyle, onPressIn: startPressIn, onPressOut: startPressOut } = useSpringPress(0.95);
+  const { animatedStyle: stopPressStyle, onPressIn: stopPressIn, onPressOut: stopPressOut } = useSpringPress(0.95);
+  const badgeSlideStyle = useSlideTransition(isTracking, { from: 'top', distance: 12 });
+
   return (
     <View style={styles.container}>
       {/* Header Section */}
       <View style={styles.headerRow}>
         <Text style={styles.headerLogo}>tiba</Text>
-        {isTracking && (
-          <View style={styles.trackingBadge}>
-            <View style={styles.trackingDot} />
-            <Text style={styles.trackingText}>TRACKING</Text>
-          </View>
-        )}
+        <Animated.View
+          style={[styles.trackingBadge, badgeSlideStyle]}
+          pointerEvents={isTracking ? 'auto' : 'none'}
+        >
+          <View style={styles.trackingDot} />
+          <Text style={styles.trackingText}>TRACKING</Text>
+        </Animated.View>
       </View>
 
       {/* Content based on state */}
@@ -109,9 +118,11 @@ export default function HomeScreen() {
               )}
             </View>
             <View style={styles.counterRight}>
-              <Text style={styles.counterNumber}>
-                {computedStationsRemaining !== null ? computedStationsRemaining : '—'}
-              </Text>
+              <Animated.View style={counterAnimStyle}>
+                <Text style={styles.counterNumber}>
+                  {computedStationsRemaining !== null ? computedStationsRemaining : '—'}
+                </Text>
+              </Animated.View>
               <Text style={styles.destinationName}>{destination.name.toUpperCase()}</Text>
               <Text style={styles.destinationSubtitle}>final destination</Text>
             </View>
@@ -136,10 +147,12 @@ export default function HomeScreen() {
                   const isFirst = idx === 0;
                   const isLast = idx === routeStations.length - 1;
                   return (
-                    <View key={station.id} style={styles.routeStationRow}>
+                    <View key={station.id} style={[styles.routeStationRow, !isFirst && !isLast && { opacity: 0.65 }]}>
                       <View style={styles.timelineColumn}>
                         {isFirst ? (
-                          <View style={[styles.routeDotCurrent, { borderColor: '#3B82F6' }]} />
+                          <Animated.View style={pulseStyle}>
+                            <View style={[styles.routeDotCurrent, { borderColor: '#3B82F6' }]} />
+                          </Animated.View>
                         ) : isLast ? (
                           <View style={[styles.routeDotDestination, { borderColor: currentLine.color }]} />
                         ) : (
@@ -170,13 +183,27 @@ export default function HomeScreen() {
 
       {/* Bottom Button */}
       {isTracking ? (
-        <Pressable onPress={handleStopTracking} style={styles.buttonStop}>
-          <Text style={styles.buttonText}>STOP TRACKING</Text>
-        </Pressable>
+        <Animated.View style={stopPressStyle}>
+          <Pressable
+            onPress={handleStopTracking}
+            onPressIn={stopPressIn}
+            onPressOut={stopPressOut}
+            style={styles.buttonStop}
+          >
+            <Text style={styles.buttonText}>STOP TRACKING</Text>
+          </Pressable>
+        </Animated.View>
       ) : (
-        <Pressable onPress={handleStartTracking} style={styles.buttonStart}>
-          <Text style={styles.buttonText}>START TRACKING</Text>
-        </Pressable>
+        <Animated.View style={startPressStyle}>
+          <Pressable
+            onPress={handleStartTracking}
+            onPressIn={startPressIn}
+            onPressOut={startPressOut}
+            style={styles.buttonStart}
+          >
+            <Text style={styles.buttonText}>START TRACKING</Text>
+          </Pressable>
+        </Animated.View>
       )}
     </View>
   );

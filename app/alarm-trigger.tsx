@@ -10,8 +10,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
+import Animated from 'react-native-reanimated';
 import { useTibaStore } from '../lib/store';
 import { colors, fonts, lineColors } from '../lib/theme';
+import { useEntryAnimation, useRotation, useSpringPress } from '../lib/animations';
 
 // ---------------------------------------------------------------------------
 // Alarm Sound
@@ -55,6 +57,12 @@ export default function AlarmTriggerModal() {
   };
   
   const lineColor = currentLine?.color ?? getLineColor(destination?.lines[0]);
+
+  // ── Animations ────────────────────────────────────────────────────────
+  const entryStyle = useEntryAnimation({ fromScale: 0.85, duration: 350 });
+  const arc1RotStyle = useRotation(true, { duration: 25000 });
+  const arc3RotStyle = useRotation(true, { duration: 35000 });
+  const { animatedStyle: dismissPressStyle, onPressIn, onPressOut } = useSpringPress(0.95);
 
   // ── Mount: start vibration + sound ────────────────────────────────────
   useEffect(() => {
@@ -108,12 +116,12 @@ export default function AlarmTriggerModal() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Decorative curved graphics - behind content */}
-      <View style={styles.decorativeArc1} />
+      <Animated.View style={[styles.decorativeArc1, arc1RotStyle]} />
       <View style={styles.decorativeArc2} />
-      <View style={styles.decorativeArc3} />
+      <Animated.View style={[styles.decorativeArc3, arc3RotStyle]} />
 
       {/* Main content */}
-      <View style={styles.content}>
+      <Animated.View style={[styles.content, entryStyle]}>
         <Text style={styles.arrivingNow}>ARRIVING NOW</Text>
 
         <Text style={styles.destination}>{stationName}</Text>
@@ -125,23 +133,24 @@ export default function AlarmTriggerModal() {
 
         {/* Indicators row */}
         <Text style={styles.indicators}>● SOUND · VIBRATION</Text>
-      </View>
+      </Animated.View>
 
       {/* Bottom section */}
       <View style={styles.bottomSection}>
         <Text style={styles.instructionText}>Tap to silence the alarm</Text>
 
-        <Pressable
-          onPress={handleDismiss}
-          style={({ pressed }) => [
-            styles.dismissButton,
-            pressed && styles.dismissButtonPressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss alarm"
-        >
-          <Text style={styles.dismissText}>DISMISS</Text>
-        </Pressable>
+        <Animated.View style={dismissPressStyle}>
+          <Pressable
+            onPress={handleDismiss}
+            onPressIn={onPressIn}
+            onPressOut={onPressOut}
+            style={styles.dismissButton}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss alarm"
+          >
+            <Text style={styles.dismissText}>DISMISS</Text>
+          </Pressable>
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
@@ -167,7 +176,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     top: -100,
     right: -120,
-    transform: [{ rotate: '-15deg' }],
   },
   decorativeArc2: {
     position: 'absolute',
@@ -187,7 +195,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     bottom: -150,
     left: -120,
-    transform: [{ rotate: '-15deg' }],
   },
   content: {
     flex: 1,
@@ -254,9 +261,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-  },
-  dismissButtonPressed: {
-    opacity: 0.8,
   },
   dismissText: {
     fontFamily: fonts.bold,
