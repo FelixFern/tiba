@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "packageManager": "bun@latest",
   "dependencies": {
+    "@react-native-community/slider": "5.2.0",
     "expo": "~56.0.12",
     "expo-av": "^16.0.8",
     "expo-constants": "~56.0.18",
