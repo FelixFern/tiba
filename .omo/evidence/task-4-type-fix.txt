@@ -1,0 +1,95 @@
+================================================================================
+TYPE CONFLICT RESOLUTION - Task 4 Complete
+================================================================================
+
+ISSUE FIXED: ✅
+Duplicate Station and Line interfaces in lib/store.ts conflicted with canonical
+definitions in lib/types.ts
+
+================================================================================
+CHANGES MADE
+================================================================================
+
+File: lib/store.ts
+
+REMOVED (lines 8-22):
+  ❌ export interface Station { ... } // WRONG structure
+  ❌ export interface Line { ... }    // WRONG structure
+
+ADDED (lines 3, 15):
+  ✅ import { Station, Line, LineId } from './types';
+  ✅ export type { Station, Line, LineId };
+
+KEPT:
+  ✅ export interface Position { ... }  // Still defined here
+  ✅ All state slice interfaces (LocationState, TripState, SettingsState)
+  ✅ All action method signatures
+  ✅ All Zustand store logic
+
+================================================================================
+TYPE CORRECTNESS
+================================================================================
+
+Station (canonical - from lib/types.ts):
+  ✅ id: string
+  ✅ name: string
+  ✅ lat: number
+  ✅ lon: number
+  ✅ lines: LineId[]                              // Array of line IDs
+  ✅ sequences: Partial<Record<LineId, number>>  // Map of line → sequence
+
+LineId (canonical - from lib/types.ts):
+  ✅ "bogor" | "cikarang" | "rangkasbitung" | "tangerang" | "tanjungpriok"
+
+Line (canonical - from lib/types.ts):
+  ✅ id: LineId
+  ✅ name: string
+  ✅ color: string
+  ✅ stations: string[]  // Array of station IDs
+
+Position (defined in store.ts):
+  ✅ lat: number
+  ✅ lon: number
+
+================================================================================
+VERIFICATION
+================================================================================
+
+TypeScript Compilation: ✅ CLEAN
+  Command: npx tsc --noEmit
+  Result: No errors
+
+Store Exports (preserved):
+  ✅ useTibaStore (hook)
+  ✅ storage (MMKV instance)
+  ✅ Position (interface)
+  ✅ Station, Line, LineId (re-exported from types)
+  ✅ LocationState (interface)
+  ✅ TripState (interface)
+  ✅ SettingsState (interface)
+  ✅ TibaStore (interface)
+
+MMKV Persistence (unchanged):
+  ✅ setDestination() - Persists to MMKV
+  ✅ setAlarmThreshold() - Persists to MMKV
+  ✅ resetStore() - Clears MMKV
+  ✅ loadPersistedState() - Restores from MMKV
+
+================================================================================
+COMPATIBILITY
+================================================================================
+
+No breaking changes - store API is unchanged:
+  ✅ useTibaStore hook signature identical
+  ✅ All state fields unchanged
+  ✅ All action methods unchanged
+  ✅ MMKV persistence logic unchanged
+
+Type consumers can now import canonical types directly:
+  Option 1: import { Station, Line } from '@/lib/store'
+  Option 2: import { Station, Line } from '@/lib/types'
+  Both will reference the same canonical types
+
+================================================================================
+STATUS: ✅ COMPLETE
+================================================================================

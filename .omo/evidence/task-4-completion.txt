@@ -1,0 +1,243 @@
+================================================================================
+TASK 4: Create Zustand Store with MMKV Persistence
+================================================================================
+
+STATUS: ✅ COMPLETED
+
+================================================================================
+DELIVERABLES
+================================================================================
+
+[✅] lib/store.ts created
+    Location: /Users/felixfernando/Developer/Random/tiba/lib/store.ts
+    Size: 7.4KB
+    TypeScript: Clean (no errors)
+
+[✅] useTibaStore hook exported
+    - Default export: useTibaStore
+    - Full type support with TibaStore interface
+
+[✅] Storage instance exported
+    - Exported: storage (MMKV instance)
+    - Ready for direct access if needed
+
+================================================================================
+STATE STRUCTURE
+================================================================================
+
+LocationState (Transient - NOT Persisted):
+  ✅ currentPosition: Position | null
+  ✅ nearestStation: Station | null
+  ✅ currentLine: Line | null
+  ✅ direction: 'increasing' | 'decreasing' | null
+  ✅ stationHistory: Station[]
+
+TripState (Partially Persisted):
+  ✅ destination: Station | null (PERSISTED to MMKV)
+  ✅ alarmThreshold: number (PERSISTED to MMKV, default = 3)
+  ✅ isAlarmActive: boolean
+  ✅ stationsRemaining: number | null
+
+SettingsState:
+  ✅ isTracking: boolean
+  ✅ hasLocationPermission: boolean
+  ✅ hasNotificationPermission: boolean
+
+================================================================================
+ACTIONS IMPLEMENTED
+================================================================================
+
+Location Actions (Transient):
+  ✅ setCurrentPosition(pos: Position | null) => void
+  ✅ setNearestStation(station: Station | null) => void
+  ✅ setCurrentLine(line: Line | null) => void
+  ✅ setDirection(direction: 'increasing' | 'decreasing' | null) => void
+  ✅ setStationHistory(stations: Station[]) => void
+  ✅ addToStationHistory(station: Station) => void
+  ✅ clearStationHistory() => void
+
+Trip Actions (Persistent):
+  ✅ setDestination(station: Station | null) => void
+     - Persists to MMKV key: 'tiba_destination'
+     - Serializes Station to JSON
+     - Removes key when null passed
+  
+  ✅ setAlarmThreshold(threshold: number) => void
+     - Persists to MMKV key: 'tiba_alarm_threshold'
+     - Stored as number type
+  
+  ✅ setIsAlarmActive(active: boolean) => void
+  ✅ setStationsRemaining(count: number | null) => void
+
+Settings Actions:
+  ✅ setIsTracking(tracking: boolean) => void
+  ✅ setHasLocationPermission(has: boolean) => void
+  ✅ setHasNotificationPermission(has: boolean) => void
+
+Utility Actions:
+  ✅ resetStore() => void
+     - Clears all MMKV persisted data
+     - Resets all state to defaults
+  
+  ✅ loadPersistedState() => void
+     - Restores destination and alarmThreshold from MMKV
+     - Called automatically at store creation
+
+================================================================================
+MMKV PERSISTENCE IMPLEMENTATION
+================================================================================
+
+Keys Used:
+  'tiba_destination'       - Persisted Station object (JSON)
+  'tiba_alarm_threshold'   - Persisted alarm threshold (number)
+
+Flow Diagram:
+  
+  APP STARTUP:
+    useTibaStore()
+      ↓
+    Zustand create() initializes
+      ↓
+    loadPersistedState() called
+      ↓
+    MMKV.getString('tiba_destination') → parse JSON → destination state
+    MMKV.getNumber('tiba_alarm_threshold') → use or default to 3
+      ↓
+    Store ready with persisted values
+
+  USER ACTION - SET DESTINATION:
+    store.setDestination(station)
+      ↓
+    Zustand set() updates state
+      ↓
+    storage.set('tiba_destination', JSON.stringify(station))
+      ↓
+    MMKV persists JSON data to device storage
+      ↓
+    Data survives app restart
+
+  USER ACTION - CLEAR DESTINATION:
+    store.setDestination(null)
+      ↓
+    Zustand set() clears state
+      ↓
+    storage.remove('tiba_destination')
+      ↓
+    MMKV key deleted from storage
+
+================================================================================
+TYPE DEFINITIONS EXPORTED
+================================================================================
+
+✅ Station - Transit station data
+   id, name, lat, lon, lineId, sequence
+
+✅ Line - Transit line information
+   id, name, color, stations[]
+
+✅ Position - GPS coordinate
+   lat, lon
+
+✅ LocationState - Location-related state
+✅ TripState - Trip planning state
+✅ SettingsState - App settings state
+✅ TibaStore - Complete store interface (extends all 3 slices)
+
+================================================================================
+USAGE EXAMPLE
+================================================================================
+
+// In a React component:
+import { useTibaStore } from '@/lib/store';
+
+export function TripPlanner() {
+  const destination = useTibaStore(s => s.destination);
+  const alarmThreshold = useTibaStore(s => s.alarmThreshold);
+  const setDestination = useTibaStore(s => s.setDestination);
+  const setAlarmThreshold = useTibaStore(s => s.setAlarmThreshold);
+
+  const handleSelectStation = (station) => {
+    setDestination(station);  // Auto-persisted to MMKV
+  };
+
+  const handleSetAlarm = (num) => {
+    setAlarmThreshold(num);   // Auto-persisted to MMKV
+  };
+
+  return (
+    <View>
+      <Text>Destination: {destination?.name}</Text>
+      <Text>Alarm at {alarmThreshold} stations</Text>
+    </View>
+  );
+}
+
+// On app restart:
+// - destination will be restored from MMKV
+// - alarmThreshold will be restored from MMKV
+
+================================================================================
+VERIFICATION CHECKLIST
+================================================================================
+
+TypeScript:
+  ✅ All interfaces properly defined
+  ✅ All actions have correct signatures
+  ✅ No type errors (tsc --noEmit clean)
+  ✅ Exported types available for consumers
+
+MMKV Integration:
+  ✅ Correct import: createMMKV from react-native-mmkv
+  ✅ Storage instance created and exported
+  ✅ MMKV methods used correctly: set(), getString(), getNumber(), remove()
+  ✅ JSON serialization for Station objects
+  ✅ Number storage for alarmThreshold
+
+State Management:
+  ✅ Zustand create() with proper types
+  ✅ State slices correctly separated
+  ✅ Actions properly update state
+  ✅ Location data NOT persisted (transient only)
+  ✅ Only destination and alarmThreshold persisted
+
+Default Values:
+  ✅ alarmThreshold defaults to 3
+  ✅ All state slices have sensible defaults
+  ✅ Persisted values loaded on startup
+
+================================================================================
+DEPENDENCIES ALREADY INSTALLED
+================================================================================
+
+✅ zustand@^5.0.14
+✅ react-native-mmkv@^4.3.1
+
+================================================================================
+NEXT STEPS FOR INTEGRATION
+================================================================================
+
+1. Import useTibaStore in screens/components:
+   import { useTibaStore } from '@/lib/store';
+
+2. Use selector hooks to get state:
+   const destination = useTibaStore(s => s.destination);
+
+3. Dispatch actions:
+   useTibaStore.getState().setDestination(station);
+
+4. For location tracking integration:
+   - Use setCurrentPosition() with GPS updates
+   - Track stationHistory with addToStationHistory()
+   - Update direction detection results
+
+5. For trip planning:
+   - User selects destination → setDestination(station)
+   - User sets alarm → setAlarmThreshold(num)
+   - Values auto-persist to MMKV
+
+6. For app reset:
+   - Call resetStore() to clear all data
+
+================================================================================
+END OF REPORT
+================================================================================
