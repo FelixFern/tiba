@@ -7,10 +7,11 @@ import {
   Vibration,
   BackHandler,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
 import { useTibaStore } from '../lib/store';
-import { colors, fonts } from '../lib/theme';
+import { colors, fonts, lineColors } from '../lib/theme';
 
 // ---------------------------------------------------------------------------
 // Alarm Sound
@@ -39,11 +40,21 @@ export default function AlarmTriggerModal() {
   const soundRef = useRef<Audio.Sound | null>(null);
 
   const destination = useTibaStore((s) => s.destination);
+  const currentLine = useTibaStore((s) => s.currentLine);
   const stationsRemaining = useTibaStore((s) => s.stationsRemaining);
   const setIsAlarmActive = useTibaStore((s) => s.setIsAlarmActive);
 
   const stationName = destination?.name?.toUpperCase() ?? 'DESTINATION';
   const remaining = stationsRemaining ?? 0;
+  
+  // Map LineId to lineColors key (tanjungpriok -> tanjungPriok)
+  const getLineColor = (lineId: string | undefined): string => {
+    if (!lineId) return '#FFFFFF';
+    const colorKey = lineId === 'tanjungpriok' ? 'tanjungPriok' : lineId;
+    return lineColors[colorKey as keyof typeof lineColors] ?? '#FFFFFF';
+  };
+  
+  const lineColor = currentLine?.color ?? getLineColor(destination?.lines[0]);
 
   // ── Mount: start vibration + sound ────────────────────────────────────
   useEffect(() => {
@@ -95,19 +106,31 @@ export default function AlarmTriggerModal() {
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      {/* Decorative curved graphics - behind content */}
+      <View style={styles.decorativeArc1} />
+      <View style={styles.decorativeArc2} />
+      <View style={styles.decorativeArc3} />
+
+      {/* Main content */}
       <View style={styles.content}>
+        <Text style={styles.arrivingNow}>ARRIVING NOW</Text>
+
         <Text style={styles.destination}>{stationName}</Text>
-        <Text style={styles.approaching}>APPROACHING</Text>
+
+        {/* Line color dot */}
+        <View style={[styles.lineDot, { backgroundColor: lineColor }]} />
 
         <Text style={styles.subtitle}>Prepare to alight</Text>
 
-        <Text style={styles.remaining}>
-          {remaining} {remaining === 1 ? 'station' : 'stations'} left
-        </Text>
+        {/* Indicators row */}
+        <Text style={styles.indicators}>● SOUND · VIBRATION</Text>
       </View>
 
-      <View style={styles.buttonContainer}>
+      {/* Bottom section */}
+      <View style={styles.bottomSection}>
+        <Text style={styles.instructionText}>Tap to silence the alarm</Text>
+
         <Pressable
           onPress={handleDismiss}
           style={({ pressed }) => [
@@ -120,7 +143,7 @@ export default function AlarmTriggerModal() {
           <Text style={styles.dismissText}>DISMISS</Text>
         </Pressable>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -134,12 +157,52 @@ const styles = StyleSheet.create({
     backgroundColor: colors.monoDanger,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+  },
+  // Decorative curved graphics
+  decorativeArc1: {
+    position: 'absolute',
+    width: 350,
+    height: 350,
+    borderRadius: 175,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    top: -100,
+    right: -120,
+    transform: [{ rotate: '-15deg' }],
+  },
+  decorativeArc2: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    top: -80,
+    right: -100,
+    transform: [{ rotate: '-15deg' }],
+  },
+  decorativeArc3: {
+    position: 'absolute',
+    width: 400,
+    height: 400,
+    borderRadius: 200,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    bottom: -150,
+    left: -120,
+    transform: [{ rotate: '-15deg' }],
   },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  arrivingNow: {
+    fontFamily: fonts.bold,
+    fontSize: 16,
+    color: colors.monoFg,
+    textAlign: 'center',
+    letterSpacing: 3,
+    textTransform: 'uppercase',
+    marginBottom: 16,
   },
   destination: {
     fontFamily: fonts.bold,
@@ -148,47 +211,57 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 56,
   },
-  approaching: {
-    fontFamily: fonts.bold,
-    fontSize: 48,
-    color: colors.monoFg,
-    textAlign: 'center',
-    lineHeight: 56,
-    marginTop: 4,
+  lineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginTop: 12,
   },
   subtitle: {
     fontFamily: fonts.regular,
-    fontSize: 24,
-    color: colors.monoFg,
-    textAlign: 'center',
-    marginTop: 24,
-    opacity: 0.85,
-  },
-  remaining: {
-    fontFamily: fonts.regular,
-    fontSize: 20,
+    fontSize: 14,
     color: colors.monoFg,
     textAlign: 'center',
     marginTop: 16,
+    opacity: 0.85,
+  },
+  indicators: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.monoFg,
+    textAlign: 'center',
+    marginTop: 24,
     opacity: 0.7,
   },
-  buttonContainer: {
-    paddingBottom: 64,
+  bottomSection: {
+    paddingBottom: 24,
+    paddingHorizontal: 24,
     width: '100%',
+    alignItems: 'center',
+  },
+  instructionText: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    color: colors.monoFg,
+    textAlign: 'center',
+    opacity: 0.6,
+    marginBottom: 16,
   },
   dismissButton: {
     backgroundColor: colors.monoFg,
-    paddingVertical: 20,
-    borderRadius: 12,
+    height: 44,
+    borderRadius: 0,
     alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
   },
   dismissButtonPressed: {
     opacity: 0.8,
   },
   dismissText: {
     fontFamily: fonts.bold,
-    fontSize: 20,
+    fontSize: 16,
     color: colors.monoDanger,
-    letterSpacing: 2,
+    letterSpacing: 1,
   },
 });
