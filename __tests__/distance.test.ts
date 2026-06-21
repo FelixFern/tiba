@@ -3,8 +3,8 @@ import {
   haversine,
   equirectangular,
   findNearestStations,
-  type Station,
 } from "../lib/distance";
+import type { Station } from "../lib/types";
 
 describe("Distance Functions", () => {
   // Test coordinates
@@ -110,15 +110,17 @@ describe("Distance Functions", () => {
 
   describe("findNearestStations", () => {
     const stations: Station[] = [
-      { id: "1", name: "Jakarta Kota", lat: JAKARTA_KOTA.lat, lon: JAKARTA_KOTA.lon },
-      { id: "2", name: "Manggarai", lat: MANGGARAI.lat, lon: MANGGARAI.lon },
-      { id: "3", name: "Bogor", lat: BOGOR.lat, lon: BOGOR.lon },
-      { id: "4", name: "Nambo", lat: NAMBO.lat, lon: NAMBO.lon },
+      { id: "1", name: "Jakarta Kota", lat: JAKARTA_KOTA.lat, lon: JAKARTA_KOTA.lon, lines: [], sequences: {} },
+      { id: "2", name: "Manggarai", lat: MANGGARAI.lat, lon: MANGGARAI.lon, lines: [], sequences: {} },
+      { id: "3", name: "Bogor", lat: BOGOR.lat, lon: BOGOR.lon, lines: [], sequences: {} },
+      { id: "4", name: "Nambo", lat: NAMBO.lat, lon: NAMBO.lon, lines: [], sequences: {} },
       {
         id: "5",
         name: "Bandung",
         lat: -6.928889,
         lon: 107.611667,
+        lines: [],
+        sequences: {},
       },
     ];
 

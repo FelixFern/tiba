@@ -1,3 +1,5 @@
+import { Station } from './types';
+
 /**
  * Earth radius in meters
  */
@@ -54,16 +56,6 @@ export function equirectangular(
   const y = Δφ;
 
   return EARTH_RADIUS * Math.sqrt(x * x + y * y);
-}
-
-/**
- * Station object type
- */
-export interface Station {
-  id: string;
-  name: string;
-  lat: number;
-  lon: number;
 }
 
 /**
