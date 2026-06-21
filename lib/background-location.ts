@@ -81,35 +81,27 @@ export async function updateLiveNotification(
   stationsRemaining: number | null
 ): Promise<void> {
   try {
-    let title = 'Tiba - Tracking';
-    let body = 'Detecting location...';
+    let title = 'Tiba · Tracking';
+    let body = 'Detecting location…';
 
     if (station && destination) {
-      title = 'Tiba - Tracking';
+      title = `${station.name} → ${destination.name}`;
       if (stationsRemaining !== null) {
-        body = `${station.name} → ${destination.name} • ${stationsRemaining} stations left`;
+        body = `${stationsRemaining} ${stationsRemaining === 1 ? 'station' : 'stations'} left · alarm armed`;
       } else {
-        body = `${station.name} → ${destination.name}`;
+        body = 'Tracking · detecting distance';
       }
     } else if (station) {
-      title = 'Tiba - Tracking';
-      body = `At ${station.name}`;
-    } else if (destination) {
-      title = 'Tiba - Tracking';
-      body = `Detecting location... → ${destination.name}`;
+      const lineName = useTibaStore.getState().currentLine?.name ?? 'Unknown line';
+      body = `Near ${station.name} · ${lineName}`;
     }
 
     await Notifications.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        data: { persistent: true },
-        priority: Notifications.AndroidNotificationPriority.DEFAULT,
-      },
+      content: { title, body, data: { persistent: true }, priority: Notifications.AndroidNotificationPriority.DEFAULT },
       trigger: null,
     });
   } catch (error) {
-    // Silently fail notification updates
+    // Silently fail
   }
 }
 
@@ -193,8 +185,8 @@ TaskManager.defineTask<LocationTaskData>(
 
             await Notifications.scheduleNotificationAsync({
               content: {
-                title: `ALARM: ${destination.name} Approaching`,
-                body: `${stationsRemaining} ${stationsRemaining === 1 ? 'station' : 'stations'} remaining`,
+                title: `ALARM: ${destination.name}`,
+                body: `${stationsRemaining} ${stationsRemaining === 1 ? 'station' : 'stations'} remaining · prepare to alight`,
                 sound: true,
                 data: { alarm: true },
                 priority: Notifications.AndroidNotificationPriority.MAX,
@@ -257,8 +249,8 @@ export async function startBackgroundTracking(): Promise<void> {
       accuracy: Location.Accuracy.Balanced,
       distanceInterval: 50,
       foregroundService: {
-        notificationTitle: 'Tiba - Tracking',
-        notificationBody: 'Detecting location...',
+        notificationTitle: 'Tiba · Tracking',
+        notificationBody: 'Detecting location…',
         notificationColor: NOTIFICATION_COLOR,
       },
       showsBackgroundLocationIndicator: Platform.OS === 'ios',
