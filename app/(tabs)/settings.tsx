@@ -1,18 +1,18 @@
-import { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Platform,
-} from 'react-native';
+import Constants from 'expo-constants';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
-import { colors, fonts } from '../../lib/theme';
-import { useTibaStore, storage } from '../../lib/store';
+import { useEffect, useState } from 'react';
+import {
+  Alert,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { storage, useTibaStore } from '../../lib/store';
+import { badgeColors, borderColors, colors, fontSize, fonts, spacing } from '../../lib/theme';
 
 export default function SettingsScreen() {
   const [locationStatus, setLocationStatus] = useState<'granted' | 'denied'>('denied');
@@ -83,84 +83,99 @@ export default function SettingsScreen() {
     );
   };
 
+  const handlePreciseLocation = () => {
+    Alert.alert(
+      'Precise Location',
+      'Enable precise location in your device Settings for better station detection accuracy.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => Linking.openSettings() },
+      ]
+    );
+  };
+
   const version = Constants.expoConfig?.version || '1.0.0';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* HEADER */}
+      <Text style={styles.header}>Settings</Text>
+
       {/* PERMISSIONS SECTION */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>PERMISSIONS</Text>
-        <View style={styles.card}>
-          <View style={styles.cardContent}>
-            <View style={styles.statusRow}>
-              <Text style={styles.label}>Location</Text>
-              <Text
-                style={[
-                  styles.status,
-                  locationStatus === 'granted' ? styles.statusGranted : styles.statusDenied,
-                ]}
-              >
-                {locationStatus === 'granted' ? 'Granted' : 'Denied'}
-              </Text>
-            </View>
-            <View style={styles.statusRow}>
-              <Text style={styles.label}>Notifications</Text>
-              <Text
-                style={[
-                  styles.status,
-                  notificationStatus === 'granted' ? styles.statusGranted : styles.statusDenied,
-                ]}
-              >
-                {notificationStatus === 'granted' ? 'Granted' : 'Denied'}
-              </Text>
-            </View>
-          </View>
+      <Text style={styles.sectionLabel}>PERMISSIONS</Text>
 
-          <TouchableOpacity
-            style={[styles.button, isLoading && styles.buttonDisabled]}
-            onPress={handleRequestLocation}
-            disabled={isLoading}
-          >
-            <Text style={styles.buttonText}>Request Location Permission</Text>
-          </TouchableOpacity>
+      {/* Location Row */}
+      <View style={styles.permissionRow}>
+        <View style={styles.permissionLeft}>
+          <Text style={styles.permissionLabel}>Location</Text>
+          <Text style={styles.permissionDescription}>Always · background tracking</Text>
+        </View>
+        <View style={styles.permissionRight}>
+          {locationStatus === 'granted' ? (
+            <Text style={styles.grantedBadge}>● GRANTED</Text>
+          ) : (
+            <TouchableOpacity onPress={handleRequestLocation} disabled={isLoading}>
+              <Text style={styles.enableButton}>ENABLE</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
 
-          <TouchableOpacity
-            style={[styles.button, styles.buttonSecondary, isLoading && styles.buttonDisabled]}
-            onPress={handleRequestNotification}
-            disabled={isLoading}
-          >
-            <Text style={styles.buttonText}>Request Notification Permission</Text>
+      {/* Notifications Row */}
+      <View style={styles.permissionRow}>
+        <View style={styles.permissionLeft}>
+          <Text style={styles.permissionLabel}>Notifications</Text>
+          <Text style={styles.permissionDescription}>Alarms & live updates</Text>
+        </View>
+        <View style={styles.permissionRight}>
+          {notificationStatus === 'granted' ? (
+            <Text style={styles.grantedBadge}>● GRANTED</Text>
+          ) : (
+            <TouchableOpacity onPress={handleRequestNotification} disabled={isLoading}>
+              <Text style={styles.enableButton}>ENABLE</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Precise Location Row */}
+      <View style={styles.permissionRow}>
+        <View style={styles.permissionLeft}>
+          <Text style={styles.permissionLabel}>Precise location</Text>
+          <Text style={styles.permissionDescription}>Improves station accuracy</Text>
+        </View>
+        <View style={styles.permissionRight}>
+          <TouchableOpacity onPress={handlePreciseLocation}>
+            <Text style={styles.enableButton}>■ ENABLE</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* ABOUT SECTION */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>ABOUT</Text>
-        <View style={styles.card}>
-          <Text style={styles.appName}>Tiba</Text>
-          <Text style={styles.version}>Version {version}</Text>
-          <Text style={styles.description}>KRL Jabodetabek station alarm app</Text>
+      <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>ABOUT</Text>
+      
+      <View style={styles.aboutRow}>
+        <View style={styles.aboutHeader}>
+          <Text style={styles.blueDot}>●</Text>
+          <Text style={styles.appName}>tiba</Text>
         </View>
+        <Text style={styles.versionText}>v{version} · KRL Jabodetabek alarm</Text>
       </View>
 
-      {/* DATA SOURCE SECTION */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>DATA SOURCE</Text>
-        <View style={styles.card}>
-          <Text style={styles.dataSource}>Indonesian Ministry of Transportation, Wikipedia, OpenStreetMap</Text>
-        </View>
-      </View>
-
-      {/* OFFLINE INDICATOR */}
-      <View style={styles.offlineIndicator}>
-        <View style={styles.offlineGreenDot} />
+      <View style={styles.offlineRow}>
+        <Text style={styles.greenDot}>●</Text>
         <Text style={styles.offlineText}>All features work offline</Text>
       </View>
 
-      {/* CLEAR DATA BUTTON */}
-      <TouchableOpacity style={styles.clearButton} onPress={handleClearData}>
-        <Text style={styles.clearButtonText}>Clear Data</Text>
+      <View style={styles.dataSourceRow}>
+        <Text style={styles.dataSourceText}>
+          Station data: Indonesian Ministry of Transportation, Wikipedia, OpenStreetMap. No accounts, no servers, no telemetry.
+        </Text>
+      </View>
+
+      {/* CLEAR DATA ACTION */}
+      <TouchableOpacity style={styles.clearDataAction} onPress={handleClearData}>
+        <Text style={styles.clearDataText}>CLEAR SAVED TRIP DATA</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -172,126 +187,126 @@ const styles = StyleSheet.create({
     backgroundColor: colors.monoBg,
   },
   contentContainer: {
-    paddingVertical: 24,
-    paddingHorizontal: 24,
+    paddingBottom: spacing.xl,
   },
-  section: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
+  header: {
     fontFamily: fonts.bold,
-    fontSize: 12,
-    color: colors.monoGray2,
-    letterSpacing: 1,
-    marginBottom: 12,
+    fontSize: fontSize.xxl,
+    color: colors.monoFg,
+    paddingTop: 64,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.xxl,
   },
-  card: {
-    backgroundColor: colors.monoGray1,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderRadius: 0,
+  sectionLabel: {
+    fontFamily: fonts.regular,
+    fontSize: fontSize.md,
+    color: '#999999',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    paddingHorizontal: spacing.xl,
+    marginBottom: spacing.md,
   },
-  cardContent: {
-    marginBottom: 16,
+  sectionLabelSpaced: {
+    marginTop: spacing.xxl,
   },
-  statusRow: {
+  permissionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: borderColors.subtle,
   },
-  label: {
+  permissionLeft: {
+    flex: 1,
+  },
+  permissionLabel: {
+    fontFamily: fonts.bold,
+    fontSize: fontSize.body,
+    color: colors.monoFg,
+    marginBottom: 4,
+  },
+  permissionDescription: {
     fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.monoFg,
+    fontSize: fontSize.sm,
+    color: '#999999',
   },
-  status: {
+  permissionRight: {
+    marginLeft: spacing.lg,
+  },
+  grantedBadge: {
     fontFamily: fonts.bold,
-    fontSize: 14,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    fontSize: fontSize.sm,
+    color: badgeColors.granted,
+    textTransform: 'uppercase',
   },
-  statusGranted: {
-    color: '#43A047',
-  },
-  statusDenied: {
-    color: '#EF4444',
-  },
-  button: {
-    backgroundColor: colors.monoAccent,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 0,
-  },
-  buttonSecondary: {
-    backgroundColor: colors.monoGray2,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
+  enableButton: {
     fontFamily: fonts.bold,
-    fontSize: 14,
-    color: colors.monoFg,
-    textAlign: 'center',
+    fontSize: fontSize.sm,
+    color: badgeColors.enable,
+    textTransform: 'uppercase',
+  },
+  aboutRow: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+  },
+  aboutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  blueDot: {
+    fontSize: fontSize.lg,
+    color: badgeColors.enable,
+    marginRight: spacing.sm,
   },
   appName: {
     fontFamily: fonts.bold,
-    fontSize: 20,
+    fontSize: fontSize.lg,
     color: colors.monoFg,
-    marginBottom: 8,
   },
-  version: {
+  versionText: {
     fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.monoGray2,
-    marginBottom: 8,
+    fontSize: fontSize.sm,
+    color: '#999999',
   },
-  description: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.monoFg,
-    lineHeight: 24,
-  },
-  dataSource: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.monoFg,
-    lineHeight: 24,
-  },
-  offlineIndicator: {
+  offlineRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    marginHorizontal: 0,
-    marginBottom: 24,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
   },
-  offlineGreenDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#43A047',
-    marginRight: 12,
+  greenDot: {
+    fontSize: spacing.sm,
+    color: badgeColors.tracking,
+    marginRight: spacing.sm,
   },
   offlineText: {
     fontFamily: fonts.regular,
-    fontSize: 16,
-    color: colors.monoFg,
+    fontSize: fontSize.sm,
+    color: '#999999',
   },
-  clearButton: {
-    backgroundColor: colors.monoDanger,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginHorizontal: 24,
-    marginBottom: 24,
-    borderRadius: 0,
+  dataSourceRow: {
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.sm,
   },
-  clearButtonText: {
+  dataSourceText: {
+    fontFamily: fonts.regular,
+    fontSize: fontSize.sm,
+    color: '#999999',
+    lineHeight: 16,
+  },
+  clearDataAction: {
+    marginTop: spacing.xxl,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.lg,
+  },
+  clearDataText: {
     fontFamily: fonts.bold,
-    fontSize: 14,
-    color: colors.monoFg,
-    textAlign: 'center',
+    fontSize: fontSize.md,
+    color: colors.monoDanger,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
   },
 });
