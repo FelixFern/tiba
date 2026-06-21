@@ -1,8 +1,9 @@
 import * as Location from 'expo-location';
 import { findNearestStations, StationWithDistance } from './distance';
-import { getAllStations } from './data';
+import { getAllStations, getLineById } from './data';
 import { useTibaStore, Position } from './store';
-import { Station } from './types';
+import { Station, LineId } from './types';
+import { detectDirection, inferLineFromStation } from './direction';
 
 // ============================================================================
 // Types
@@ -15,6 +16,12 @@ type LocationSubscription = Location.LocationSubscription | null;
 // ============================================================================
 
 let locationSubscription: LocationSubscription = null;
+
+// Circular buffer for tracking detected stations (max 3)
+let detectedStations: Station[] = [];
+
+// Line history for inferring current line on multi-line stations
+let lineHistory: LineId[] = [];
 
 // ============================================================================
 // Request Location Permissions
@@ -150,5 +157,69 @@ export function stopForegroundTracking(): void {
     useTibaStore.setState({ isTracking: false });
   } catch (error) {
     console.error('Error stopping location tracking:', error);
+  }
+}
+
+// ============================================================================
+// Update Direction Detection
+// ============================================================================
+
+/**
+ * Update direction and inferred line based on station history
+ * Maintains circular buffer of last 3 detected stations
+ * Infers current line from most common line in history (for multi-line stations)
+ * Calls detectDirection and updates store with result
+ *
+ * This function should be called whenever nearestStation is updated
+ * to continuously refine direction and line detection
+ *
+ * @returns void
+ */
+export function updateDirectionDetection(): void {
+  try {
+    const state = useTibaStore.getState();
+    const { nearestStation } = state;
+
+    if (!nearestStation) {
+      return;
+    }
+
+    // Add station to circular buffer (max 3 stations)
+    detectedStations.unshift(nearestStation);
+    if (detectedStations.length > 3) {
+      detectedStations.pop();
+    }
+
+    // Track line from this station
+    for (const line of nearestStation.lines) {
+      lineHistory.unshift(line);
+    }
+    if (lineHistory.length > 3) {
+      lineHistory.pop();
+    }
+
+    // Need at least one station to infer a line
+    if (detectedStations.length === 0) {
+      return;
+    }
+
+    // Infer current line from most recent station and line history
+    const inferredLineId = inferLineFromStation(nearestStation, lineHistory);
+    const inferredLine = getLineById(inferredLineId);
+
+    if (!inferredLine) {
+      return;
+    }
+
+    // Detect direction using station history and inferred line
+    const direction = detectDirection(detectedStations, inferredLine);
+
+    // Update store with inferred line and detected direction
+    useTibaStore.setState({
+      currentLine: inferredLine,
+      direction,
+    });
+  } catch (error) {
+    console.error('Error updating direction detection:', error);
   }
 }
