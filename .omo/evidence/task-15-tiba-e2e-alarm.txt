@@ -1,0 +1,9 @@
+TIBA E2E Integration Test - 2026-06-21T11:13:41.125Z
+================================================================================
+
+
+🚨 ALARM TRIGGERED at Lenteng Agung
+   Destination: Jakarta Kota
+   Stations Remaining: 15
+   Threshold: 15
+   Calculation: 16 - 1 = 15

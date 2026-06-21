@@ -1,0 +1,89 @@
+TIBA E2E Integration Test - 2026-06-21T11:13:41.125Z
+================================================================================
+
+=== TIBA E2E INTEGRATION TEST ===
+Route: Depok → Jakarta Kota (Bogor line, decreasing direction)
+Threshold: 15 stations
+Expected alarm trigger: Lenteng Agung (15 stations remaining)
+
+--- Step 1: Configuration ---
+✓ Destination: Jakarta Kota (seq 1)
+✓ Threshold: 15 stations
+✓ Alarm state reset
+
+--- Step 2: Depok (seq 21) ---
+  currentPosition: (-6.285833, 106.830278)
+  nearestStation: Depok
+  currentLine: Bogor Line
+  direction: null
+  stationsRemaining: null
+  isAlarmActive: false
+  ✓ nearestStation should be Depok (got Depok)
+
+--- Step 3: Depok Baru (seq 20) ---
+  currentPosition: (-6.318889, 106.839444)
+  nearestStation: Depok Baru
+  currentLine: Bogor Line
+  direction: null
+  stationsRemaining: null
+  isAlarmActive: false
+  ✓ nearestStation should be Depok Baru (got Depok Baru)
+
+--- Step 4: Pondok Cina (seq 19) ---
+  currentPosition: (-6.362500, 106.832222)
+  nearestStation: Pondok Cina
+  currentLine: Bogor Line
+  direction: decreasing
+  stationsRemaining: 18
+  isAlarmActive: false
+  ✓ nearestStation should be Pondok Cina (got Pondok Cina)
+  ✓ direction should be 'decreasing' after 3 stations (got 'decreasing')
+  ✓ stationsRemaining should be 18 (got 18)
+
+--- Step 5: Universitas Indonesia (seq 18) ---
+  currentPosition: (-6.363611, 106.830556)
+  nearestStation: Universitas Indonesia
+  currentLine: Bogor Line
+  direction: decreasing
+  stationsRemaining: 17
+  isAlarmActive: false
+  ✓ nearestStation should be Universitas Indonesia (got Universitas Indonesia)
+  ✓ direction should be 'decreasing' after 3 stations (got 'decreasing')
+  ✓ stationsRemaining should be 17 (got 17)
+
+--- Step 6: Universitas Pancasila (seq 17) ---
+  currentPosition: (-6.375000, 106.825000)
+  nearestStation: Universitas Pancasila
+  currentLine: Bogor Line
+  direction: decreasing
+  stationsRemaining: 16
+  isAlarmActive: false
+  ✓ nearestStation should be Universitas Pancasila (got Universitas Pancasila)
+  ✓ direction should be 'decreasing' after 3 stations (got 'decreasing')
+  ✓ stationsRemaining should be 16 (got 16)
+
+--- Step 7: Lenteng Agung (seq 16) ---
+  currentPosition: (-6.399722, 106.825278)
+  nearestStation: Lenteng Agung
+  currentLine: Bogor Line
+  direction: decreasing
+  stationsRemaining: 15
+  isAlarmActive: false
+  ✓ nearestStation should be Lenteng Agung (got Lenteng Agung)
+  ✓ direction should be 'decreasing' after 3 stations (got 'decreasing')
+  ✓ stationsRemaining should be 15 (got 15)
+  🚨 ALARM TRIGGERED
+  ✓ alarm should trigger at Lenteng Agung (triggered at Lenteng Agung)
+  ✓ alarm should trigger at 15 stations remaining (triggered at 15)
+
+--- Final Verification ---
+  ✓ alarm should be active after reaching threshold station
+  ✓ final nearestStation should be Lenteng Agung (got Lenteng Agung)
+  ✓ final direction should be 'decreasing' (got 'decreasing')
+  ✓ final stationsRemaining should be 15 (got 15)
+  ✓ final currentLine should be Bogor (got Bogor Line)
+
+=== TEST SUMMARY ===
+Tests Passed: 21
+Tests Failed: 0
+✅ ALL TESTS PASSED
