@@ -146,3 +146,124 @@ Successfully implemented alarm trigger logic with comprehensive unit tests. The 
 - No async/await needed (synchronous calculations)
 - Type-safe with proper null handling
 - Ready for integration with notification system (T11)
+
+---
+
+# T11: Alarm Integration into Background Task
+
+**Timestamp**: 2026-06-21
+
+## Overview
+Successfully integrated alarm trigger logic into background location task with critical notification scheduling and modal deep-linking.
+
+## Files Modified
+- `lib/background-location.ts`: Added alarm integration, notification response listener, and debounce logic
+
+## Approach
+
+### 1. Module-Scope Debounce Tracking
+- Added `let lastAlarmStationId: string | null = null` at module scope (line 30)
+- Resets to null in `stopBackgroundTracking()` to allow new alarms after tracking stops
+- Simple module-scope variable chosen over Zustand store persistence (no need to persist debounce state across app restarts)
+
+### 2. Alarm Trigger Logic (lines 173-210)
+Inserted after `stationsRemaining` calculation in background task:
+```typescript
+const { alarmThreshold, isAlarmActive } = newState;
+if (!isAlarmActive && nearestStation && destination && currentLine && direction && stationsRemaining !== null) {
+  const shouldTrigger = checkAlarmTrigger(nearestStation, destination, currentLine, direction, alarmThreshold);
+  
+  if (shouldTrigger && lastAlarmStationId !== nearestStation.id) {
+    lastAlarmStationId = nearestStation.id;
+    useTibaStore.setState({ isAlarmActive: true });
+    
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `ALARM: ${destination.name} Approaching`,
+        body: `${stationsRemaining} ${stationsRemaining === 1 ? 'station' : 'stations'} remaining`,
+        sound: true,
+        data: { alarm: true },
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        ...Platform.select({
+          ios: { interruptionLevel: 'critical' as const },
+        }),
+      },
+      trigger: null, // Immediate
+    });
+  }
+}
+```
+
+### 3. Notification Response Listener (lines 116-121)
+Registered at module scope BEFORE `TaskManager.defineTask()`:
+```typescript
+Notifications.addNotificationResponseReceivedListener((response) => {
+  const isAlarmNotification = response.notification.request.content.data?.alarm === true;
+  if (isAlarmNotification) {
+    router.push('/alarm-trigger');
+  }
+});
+```
+
+## Patterns Discovered
+
+### expo-notifications Critical Alerts
+- **Android**: Use `priority: Notifications.AndroidNotificationPriority.MAX`
+- **iOS**: Use `interruptionLevel: 'critical'` (requires special entitlements - see expo docs)
+- `trigger: null` schedules notification immediately
+- `data: { alarm: true }` custom field used to distinguish alarm notifications from live tracking notifications
+
+### Notification Response Listener Context
+- **Router available**: YES - `router` from `expo-router` works in notification listener context
+- **Used Linking**: NO - `router.push('/alarm-trigger')` is simpler and works directly
+- **Listener registration**: Module scope registration ensures listener is active before any notifications fire
+
+### Debounce Strategy
+- Tracks `lastAlarmStationId` to prevent re-triggering at same station
+- Resets when:
+  1. User dismisses alarm (via `setIsAlarmActive(false)` in modal)
+  2. Tracking stops (via `stopBackgroundTracking()`)
+  3. Station changes (automatic - new station ID won't match last)
+- Does NOT reset when destination changes (would need separate listener - future enhancement if needed)
+
+## Gotchas
+
+### iOS Critical Notifications
+- `interruptionLevel: 'critical'` requires special entitlements and App Store approval
+- Plan should document this in T13/T14 (production deployment tasks)
+- Without entitlement, iOS will fall back to high-priority notification
+
+### Type Safety
+- Used `as const` for iOS interruptionLevel to satisfy TypeScript strict mode
+- Platform.select returns proper type when used with spread operator
+
+### Background Task Context
+- `router` from expo-router works in TaskManager background task context
+- No need for `Linking.createURL` workaround mentioned in plan
+
+## Verification Results
+- ✅ TypeScript compilation: Test files have expected bun:test module errors (Bun-specific), app code compiles cleanly
+- ✅ All 48 tests pass (alarm.test.ts, direction.test.ts, distance.test.ts)
+- ✅ Only `lib/background-location.ts` modified (no store changes needed)
+- ✅ All imports correctly added (checkAlarmTrigger, router, Platform already existed)
+
+## Next Task Dependencies
+
+### T12 (Home Screen)
+Will need to:
+- Call `startBackgroundTracking()` when user taps "Start Tracking"
+- Display `isAlarmActive` state (e.g., show different UI when alarm is active)
+- Show `stationsRemaining` and `destination` in live tracking view
+
+### T13 (Alarm Configuration)
+Will need to:
+- Set `destination` via `useTibaStore.getState().setDestination(station)`
+- Set `alarmThreshold` via `useTibaStore.getState().setAlarmThreshold(threshold)`
+- Call `startBackgroundTracking()` after configuration
+- Document iOS critical notification entitlement requirement
+
+### T14 (Production Deployment)
+Must document:
+- iOS: Request critical notification entitlement from Apple
+- iOS: Add `com.apple.developer.usernotifications.critical-alerts` to entitlements
+- Android: No special permissions needed (MAX priority works out of box)

@@ -1,8 +1,10 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
 import { updateNearestStation, updateDirectionDetection } from './location';
 import { useTibaStore, Position, Station, LineId } from './store';
+import { checkAlarmTrigger } from './alarm';
 import { Platform } from 'react-native';
 
 // ============================================================================
@@ -25,6 +27,7 @@ const NOTIFICATION_COLOR = '#3B82F6';
 // ============================================================================
 
 let lastNotifiedStationId: string | null = null;
+let lastAlarmStationId: string | null = null;
 
 // ============================================================================
 // Calculate Stations Remaining
@@ -110,6 +113,13 @@ export async function updateLiveNotification(
   }
 }
 
+Notifications.addNotificationResponseReceivedListener((response) => {
+  const isAlarmNotification = response.notification.request.content.data?.alarm === true;
+  if (isAlarmNotification) {
+    router.push('/alarm-trigger');
+  }
+});
+
 // ============================================================================
 // Background Task Definition
 // ============================================================================
@@ -158,6 +168,45 @@ TaskManager.defineTask<LocationTaskData>(
             currentLine.id
           );
           useTibaStore.setState({ stationsRemaining });
+        }
+
+        const { alarmThreshold, isAlarmActive } = newState;
+        if (
+          !isAlarmActive &&
+          nearestStation &&
+          destination &&
+          currentLine &&
+          direction &&
+          stationsRemaining !== null
+        ) {
+          const shouldTrigger = checkAlarmTrigger(
+            nearestStation,
+            destination,
+            currentLine,
+            direction,
+            alarmThreshold
+          );
+
+          if (shouldTrigger && lastAlarmStationId !== nearestStation.id) {
+            lastAlarmStationId = nearestStation.id;
+            useTibaStore.setState({ isAlarmActive: true });
+
+            await Notifications.scheduleNotificationAsync({
+              content: {
+                title: `ALARM: ${destination.name} Approaching`,
+                body: `${stationsRemaining} ${stationsRemaining === 1 ? 'station' : 'stations'} remaining`,
+                sound: true,
+                data: { alarm: true },
+                priority: Notifications.AndroidNotificationPriority.MAX,
+                ...Platform.select({
+                  ios: {
+                    interruptionLevel: 'critical' as const,
+                  },
+                }),
+              },
+              trigger: null,
+            });
+          }
         }
 
         const currentStationId = nearestStation?.id || null;
@@ -243,6 +292,7 @@ export async function stopBackgroundTracking(): Promise<void> {
     }
 
     lastNotifiedStationId = null;
+    lastAlarmStationId = null;
 
     useTibaStore.setState({ isTracking: false });
   } catch (error) {
