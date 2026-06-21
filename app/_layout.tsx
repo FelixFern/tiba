@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { View } from 'react-native';
-import { Slot, SplashScreen } from 'expo-router';
+import { Stack, SplashScreen } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '../lib/theme';
@@ -26,7 +26,18 @@ export default function RootLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.monoBg }}>
       <StatusBar style="light" />
-      <Slot />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="alarm-trigger"
+          options={{
+            presentation: 'fullScreenModal',
+            gestureEnabled: false,
+            headerShown: false,
+            animation: 'fade',
+          }}
+        />
+      </Stack>
     </View>
   );
 }
