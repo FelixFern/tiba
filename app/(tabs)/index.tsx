@@ -11,6 +11,7 @@ import {
 } from '../../lib/location';
 import { calculateStationsRemaining } from '../../lib/alarm';
 import { getStationsByLine } from '../../lib/data';
+import PageHeader from '../../components/PageHeader';
 
 export default function HomeScreen() {
   const nearestStation = useTibaStore((s) => s.nearestStation);
@@ -68,19 +69,19 @@ export default function HomeScreen() {
   const { animatedStyle: stopPressStyle, onPressIn: stopPressIn, onPressOut: stopPressOut } = useSpringPress(0.95);
   const badgeSlideStyle = useSlideTransition(isTracking, { from: 'top', distance: 12 });
 
+  const trackingBadge = (
+    <Animated.View
+      style={[styles.trackingBadge, badgeSlideStyle]}
+      pointerEvents={isTracking ? 'auto' : 'none'}
+    >
+      <View style={styles.trackingDot} />
+      <Text style={styles.trackingText}>TRACKING</Text>
+    </Animated.View>
+  );
+
   return (
     <View style={styles.container}>
-      {/* Header Section */}
-      <View style={styles.headerRow}>
-        <Text style={styles.headerLogo}>tiba</Text>
-        <Animated.View
-          style={[styles.trackingBadge, badgeSlideStyle]}
-          pointerEvents={isTracking ? 'auto' : 'none'}
-        >
-          <View style={styles.trackingDot} />
-          <Text style={styles.trackingText}>TRACKING</Text>
-        </Animated.View>
-      </View>
+      <PageHeader title="tiba" right={trackingBadge} />
 
       {/* Content based on state */}
       {!isTracking && !destination ? (
@@ -214,20 +215,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.monoBg,
     paddingHorizontal: spacing.xl,
-    paddingTop: 72,
     paddingBottom: spacing.xl,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xxl,
-  },
-  headerLogo: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.lg,
-    color: colors.monoFg,
-    letterSpacing: 4,
   },
   trackingBadge: {
     flexDirection: 'row',
@@ -426,19 +414,17 @@ const styles = StyleSheet.create({
   },
   buttonStart: {
     backgroundColor: colors.monoAccent,
-    paddingVertical: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 44,
+    height: 48,
   },
   buttonStop: {
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: borderColors.subtle,
-    paddingVertical: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 44,
+    height: 48,
   },
   buttonText: {
     fontFamily: fonts.bold,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,29 +9,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Audio } from 'expo-av';
+import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import Animated from 'react-native-reanimated';
 import { useTibaStore } from '../lib/store';
 import { colors, fonts, lineColors } from '../lib/theme';
 import { useEntryAnimation, useRotation, useSpringPress } from '../lib/animations';
 
-// ---------------------------------------------------------------------------
-// Alarm Sound
-// ---------------------------------------------------------------------------
-
-async function loadAlarmSound(): Promise<Audio.Sound | null> {
-  try {
-    const { sound } = await Audio.Sound.createAsync(
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      require('../assets/sounds/alarm.mp3'),
-      { shouldPlay: true, isLooping: true, volume: 1.0 },
-    );
-    return sound;
-  } catch {
-    // Graceful fallback – alarm.mp3 may not exist yet
-    return null;
-  }
-}
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const alarmSource = require('../assets/sounds/alarm.mp3');
 
 // ---------------------------------------------------------------------------
 // Component
@@ -39,7 +24,7 @@ async function loadAlarmSound(): Promise<Audio.Sound | null> {
 
 export default function AlarmTriggerModal() {
   const router = useRouter();
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const player = useAudioPlayer(alarmSource);
 
   const destination = useTibaStore((s) => s.destination);
   const currentLine = useTibaStore((s) => s.currentLine);
@@ -68,29 +53,20 @@ export default function AlarmTriggerModal() {
   useEffect(() => {
     Vibration.vibrate([0, 1000, 1000], true);
 
-    let mounted = true;
-
-    void Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
+    void setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
     }).then(() => {
-      if (!mounted) return;
-      void loadAlarmSound().then((sound) => {
-        if (!mounted) {
-          void sound?.unloadAsync();
-          return;
-        }
-        soundRef.current = sound;
-      });
+      player.loop = true;
+      player.volume = 1.0;
+      player.play();
     });
 
     return () => {
-      mounted = false;
       Vibration.cancel();
-      void soundRef.current?.stopAsync();
-      void soundRef.current?.unloadAsync();
+      player.pause();
     };
-  }, []);
+  }, [player]);
 
   // ── Block hardware back button ────────────────────────────────────────
   useEffect(() => {
@@ -101,16 +77,10 @@ export default function AlarmTriggerModal() {
   // ── Dismiss handler ───────────────────────────────────────────────────
   const handleDismiss = useCallback(() => {
     Vibration.cancel();
-
-    if (soundRef.current) {
-      void soundRef.current.stopAsync();
-      void soundRef.current.unloadAsync();
-      soundRef.current = null;
-    }
-
+    player.pause();
     setIsAlarmActive(false);
     router.back();
-  }, [setIsAlarmActive, router]);
+  }, [player, setIsAlarmActive, router]);
 
   // ── Render ────────────────────────────────────────────────────────────
   return (

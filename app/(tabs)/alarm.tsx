@@ -12,6 +12,7 @@ import {
 } from '../../lib/background-location';
 import { useScaleEntrance, useSpringPress, useSlideTransition } from '../../lib/animations';
 import type { Station } from '../../lib/types';
+import PageHeader from '../../components/PageHeader';
 
 function StationRow({ item, isSelected, onSelect }: { item: Station; isSelected: boolean; onSelect: (s: Station) => void }) {
   const checkStyle = useScaleEntrance(isSelected);
@@ -87,21 +88,11 @@ export default function AlarmScreen() {
     }
   }, [setDestination, isTracking]);
 
-  const handleBackPress = useCallback(() => {
-    router.push('/(tabs)');
-  }, []);
-
   const cardSlideStyle = useSlideTransition(!!destination, { from: 'bottom', distance: 20, duration: 280 });
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={handleBackPress} style={styles.backButton}>
-          <Text style={styles.backArrow}>‹</Text>
-        </Pressable>
-        <Text style={styles.headerTitle}>SET DESTINATION</Text>
-      </View>
+      <PageHeader title="ALARM" />
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -214,29 +205,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.monoBg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingTop: 64,
-    paddingBottom: spacing.lg,
-    gap: spacing.md,
-  },
-  backButton: {
-    padding: spacing.sm,
-    marginLeft: -spacing.sm,
-  },
-  backArrow: {
-    fontFamily: fonts.regular,
-    fontSize: 24,
-    color: colors.monoFg,
-  },
-  headerTitle: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.lg,
-    color: colors.monoFg,
-    letterSpacing: 2,
   },
   searchContainer: {
     paddingHorizontal: spacing.xl,

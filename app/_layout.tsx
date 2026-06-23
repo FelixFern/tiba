@@ -1,8 +1,9 @@
+import { useFonts } from 'expo-font';
+import { SplashScreen, Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
-import { Stack, SplashScreen } from 'expo-router';
-import { useFonts } from 'expo-font';
-import { StatusBar } from 'expo-status-bar';
+import DevTools from '../components/DevTools';
 import { colors } from '../lib/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -38,6 +39,7 @@ export default function RootLayout() {
           }}
         />
       </Stack>
+      <DevTools />
     </View>
   );
 }

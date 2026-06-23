@@ -15,6 +15,7 @@ import Animated from 'react-native-reanimated';
 import { storage, useTibaStore } from '../../lib/store';
 import { badgeColors, borderColors, colors, fontSize, fonts, spacing } from '../../lib/theme';
 import { useSpringPress } from '../../lib/animations';
+import PageHeader from '../../components/PageHeader';
 
 function AnimatedButton({
   onPress,
@@ -127,8 +128,7 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* HEADER */}
-      <Text style={styles.header}>Settings</Text>
+      <PageHeader title="SETTINGS" />
 
       {/* PERMISSIONS SECTION */}
       <Text style={styles.sectionLabel}>PERMISSIONS</Text>
@@ -217,14 +217,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: spacing.xl,
-  },
-  header: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.xxl,
-    color: colors.monoFg,
-    paddingTop: 64,
-    paddingHorizontal: spacing.xl,
-    marginBottom: spacing.xxl,
   },
   sectionLabel: {
     fontFamily: fonts.regular,

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Background -->
+  <rect width="1024" height="1024" fill="#0A0A0A"/>
+
+  <!-- Line 2: vertical crossing line (behind Line 1) -->
+  <line x1="500" y1="160" x2="500" y2="840" stroke="#3B82F6" stroke-width="48" stroke-linecap="round"/>
+
+  <!-- Line 1: journey line — 45° diagonal up-right then horizontal to destination -->
+  <polyline points="200,740 500,440 840,440" fill="none" stroke="#3B82F6" stroke-width="48" stroke-linecap="round" stroke-linejoin="miter"/>
+
+  <!-- Regular station: on diagonal -->
+  <circle cx="350" cy="590" r="16" fill="#FAFAFA"/>
+
+  <!-- Regular station: on Line 2 above interchange -->
+  <circle cx="500" cy="280" r="16" fill="#FAFAFA"/>
+
+  <!-- Interchange station: where lines cross -->
+  <circle cx="500" cy="440" r="20" fill="#FAFAFA"/>
+
+  <!-- Regular station: on horizontal approaching destination -->
+  <circle cx="670" cy="440" r="16" fill="#FAFAFA"/>
+
+  <!-- Destination station: terminus ring (the "arrival" target) -->
+  <circle cx="840" cy="440" r="44" fill="#0A0A0A" stroke="#FAFAFA" stroke-width="10"/>
+  <circle cx="840" cy="440" r="16" fill="#FAFAFA"/>
+</svg>

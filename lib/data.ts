@@ -26,7 +26,7 @@ export function getLineById(id: LineId): Line | undefined {
 
 /**
  * Get all stations
- * @returns Array of all 93 stations
+ * @returns Array of all 74 stations
  */
 export function getAllStations(): Station[] {
   return stations;
