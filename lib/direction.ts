@@ -53,6 +53,46 @@ export function detectDirection(
 }
 
 /**
+ * Predict travel direction as early and robustly as possible.
+ *
+ * Unlike `detectDirection` (which needs 3 strictly-monotonic stations), this
+ * collapses repeated/oscillating samples and infers direction from the two most
+ * recent *distinct* sequence positions on the line. That means a prediction is
+ * available after just two different stations, and brief GPS noise that snaps
+ * back to the same station doesn't reset the signal.
+ *
+ * @param stationHistory - Stations visited, most recent first
+ * @param currentLine - The line currently being travelled
+ * @returns 'increasing' | 'decreasing' | null (not enough distinct data)
+ */
+export function predictDirection(
+  stationHistory: Station[],
+  currentLine: Line
+): 'increasing' | 'decreasing' | null {
+  // Sequence positions on this line, most recent first, defined only.
+  const sequences = stationHistory
+    .map((station) => station.sequences[currentLine.id])
+    .filter((seq): seq is number => seq !== undefined);
+
+  // Collapse consecutive duplicates (same station sampled repeatedly).
+  const distinct: number[] = [];
+  for (const seq of sequences) {
+    if (distinct[distinct.length - 1] !== seq) {
+      distinct.push(seq);
+    }
+  }
+
+  if (distinct.length < 2) {
+    return null;
+  }
+
+  const [newer, older] = distinct;
+  if (newer > older) return 'increasing';
+  if (newer < older) return 'decreasing';
+  return null;
+}
+
+/**
  * Calculate the mode (most common value) in an array
  * Used to infer the current line from station history
  *

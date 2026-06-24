@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { createMMKV } from 'react-native-mmkv';
+import { storage } from './storage';
 import { Station, Line, LineId } from './types';
 
 // ============================================================================
@@ -23,7 +23,6 @@ export interface LocationState {
   nearestStation: Station | null;
   currentLine: Line | null;
   direction: 'increasing' | 'decreasing' | null;
-  stationHistory: Station[];
 }
 
 export interface TripState {
@@ -36,7 +35,6 @@ export interface TripState {
 export interface SettingsState {
   isTracking: boolean;
   hasLocationPermission: boolean;
-  hasNotificationPermission: boolean;
 }
 
 // ============================================================================
@@ -44,48 +42,34 @@ export interface SettingsState {
 // ============================================================================
 
 export interface TibaStore extends LocationState, TripState, SettingsState {
-  // Location actions
-  setCurrentPosition: (pos: Position | null) => void;
-  setNearestStation: (station: Station | null) => void;
-  setCurrentLine: (line: Line | null) => void;
-  setDirection: (direction: 'increasing' | 'decreasing' | null) => void;
-  setStationHistory: (stations: Station[]) => void;
-  addToStationHistory: (station: Station) => void;
-  clearStationHistory: () => void;
-
-  // Trip actions
+  // Trip actions (persisted to MMKV)
   setDestination: (station: Station | null) => void;
   setAlarmThreshold: (threshold: number) => void;
   setIsAlarmActive: (active: boolean) => void;
-  setStationsRemaining: (count: number | null) => void;
-
-  // Settings actions
-  setIsTracking: (tracking: boolean) => void;
-  setHasLocationPermission: (has: boolean) => void;
-  setHasNotificationPermission: (has: boolean) => void;
 
   // Utility
   resetStore: () => void;
-  loadPersistedState: () => void;
 }
 
 // ============================================================================
-// MMKV Storage Instance
+// Persistence Keys
 // ============================================================================
-
-export const storage = createMMKV();
 
 const MMKV_KEYS = {
   DESTINATION: 'tiba_destination',
   ALARM_THRESHOLD: 'tiba_alarm_threshold',
 };
 
+// Transient location/settings state mutated directly via useTibaStore.setState()
+// from the location/notification layers (outside React) — no action creators
+// needed for those.
+
 // ============================================================================
 // Zustand Store
 // ============================================================================
 
-export const useTibaStore = create<TibaStore>((set, get) => {
-  // Initialize from MMKV on first load
+export const useTibaStore = create<TibaStore>((set) => {
+  // Initialize persisted preferences from MMKV on first load.
   const loadPersistedState = () => {
     const savedDestination = storage.getString(MMKV_KEYS.DESTINATION);
     const savedAlarmThreshold = storage.getNumber(MMKV_KEYS.ALARM_THRESHOLD);
@@ -111,16 +95,15 @@ export const useTibaStore = create<TibaStore>((set, get) => {
 
   return {
     // ========================================================================
-    // Location State (Transient)
+    // Location State (transient)
     // ========================================================================
     currentPosition: null,
     nearestStation: null,
     currentLine: null,
     direction: null,
-    stationHistory: [],
 
     // ========================================================================
-    // Trip State (Partial Persistence)
+    // Trip State (partial persistence)
     // ========================================================================
     destination: persistedState.destination || null,
     alarmThreshold: persistedState.alarmThreshold ?? 3,
@@ -132,33 +115,6 @@ export const useTibaStore = create<TibaStore>((set, get) => {
     // ========================================================================
     isTracking: false,
     hasLocationPermission: false,
-    hasNotificationPermission: false,
-
-    // ========================================================================
-    // Location Actions
-    // ========================================================================
-    setCurrentPosition: (pos) =>
-      set({ currentPosition: pos }),
-
-    setNearestStation: (station) =>
-      set({ nearestStation: station }),
-
-    setCurrentLine: (line) =>
-      set({ currentLine: line }),
-
-    setDirection: (direction) =>
-      set({ direction }),
-
-    setStationHistory: (stations) =>
-      set({ stationHistory: stations }),
-
-    addToStationHistory: (station) =>
-      set((state) => ({
-        stationHistory: [station, ...state.stationHistory],
-      })),
-
-    clearStationHistory: () =>
-      set({ stationHistory: [] }),
 
     // ========================================================================
     // Trip Actions (with MMKV Persistence)
@@ -166,7 +122,6 @@ export const useTibaStore = create<TibaStore>((set, get) => {
     setDestination: (station) => {
       set({ destination: station });
 
-      // Persist to MMKV
       if (station) {
         try {
           storage.set(MMKV_KEYS.DESTINATION, JSON.stringify(station));
@@ -181,7 +136,6 @@ export const useTibaStore = create<TibaStore>((set, get) => {
     setAlarmThreshold: (threshold) => {
       set({ alarmThreshold: threshold });
 
-      // Persist to MMKV
       try {
         storage.set(MMKV_KEYS.ALARM_THRESHOLD, threshold);
       } catch (e) {
@@ -189,23 +143,7 @@ export const useTibaStore = create<TibaStore>((set, get) => {
       }
     },
 
-    setIsAlarmActive: (active) =>
-      set({ isAlarmActive: active }),
-
-    setStationsRemaining: (count) =>
-      set({ stationsRemaining: count }),
-
-    // ========================================================================
-    // Settings Actions
-    // ========================================================================
-    setIsTracking: (tracking) =>
-      set({ isTracking: tracking }),
-
-    setHasLocationPermission: (has) =>
-      set({ hasLocationPermission: has }),
-
-    setHasNotificationPermission: (has) =>
-      set({ hasNotificationPermission: has }),
+    setIsAlarmActive: (active) => set({ isAlarmActive: active }),
 
     // ========================================================================
     // Utility Actions
@@ -220,7 +158,6 @@ export const useTibaStore = create<TibaStore>((set, get) => {
         nearestStation: null,
         currentLine: null,
         direction: null,
-        stationHistory: [],
 
         // Trip
         destination: null,
@@ -231,13 +168,7 @@ export const useTibaStore = create<TibaStore>((set, get) => {
         // Settings
         isTracking: false,
         hasLocationPermission: false,
-        hasNotificationPermission: false,
       });
-    },
-
-    loadPersistedState: () => {
-      const state = loadPersistedState();
-      set(state);
     },
   };
 });

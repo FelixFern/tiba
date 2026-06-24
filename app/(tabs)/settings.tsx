@@ -12,7 +12,8 @@ import {
   View
 } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { storage, useTibaStore } from '../../lib/store';
+import { useTibaStore } from '../../lib/store';
+import { storage } from '../../lib/storage';
 import { badgeColors, borderColors, colors, fontSize, fonts, spacing } from '../../lib/theme';
 import { useSpringPress } from '../../lib/animations';
 import PageHeader from '../../components/PageHeader';

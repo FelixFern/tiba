@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { router } from 'expo-router';
 import Animated from 'react-native-reanimated';
 import { useAnimatedCounter, usePulse, useSpringPress, useSlideTransition } from '../../lib/animations';
 import { colors, fonts, spacing, fontSize, borderColors, badgeColors } from '../../lib/theme';
@@ -8,6 +9,7 @@ import {
   requestLocationPermissions,
   startForegroundTracking,
   stopForegroundTracking,
+  refreshCurrentLocationOnce,
 } from '../../lib/location';
 import { calculateStationsRemaining } from '../../lib/alarm';
 import { getStationsByLine } from '../../lib/data';
@@ -21,6 +23,15 @@ export default function HomeScreen() {
   const stationsRemaining = useTibaStore((s) => s.stationsRemaining);
   const isTracking = useTibaStore((s) => s.isTracking);
   const alarmThreshold = useTibaStore((s) => s.alarmThreshold);
+
+  // Populate current position/line on load without a full tracking session.
+  useEffect(() => {
+    if (!isTracking && !nearestStation) {
+      void refreshCurrentLocationOnce();
+    }
+    // Only on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleStartTracking = async () => {
     await requestLocationPermissions();
@@ -42,8 +53,8 @@ export default function HomeScreen() {
   const routeStations = useMemo(() => {
     if (!currentLine || !direction || !nearestStation || !destination) return [];
     const lineStations = getStationsByLine(currentLine.id);
-    const currentIdx = lineStations.findIndex(s => s.id === nearestStation.id);
-    const destIdx = lineStations.findIndex(s => s.id === destination.id);
+    const currentIdx = lineStations.findIndex((s) => s.id === nearestStation.id);
+    const destIdx = lineStations.findIndex((s) => s.id === destination.id);
     if (currentIdx === -1 || destIdx === -1) return [];
     const start = Math.min(currentIdx, destIdx);
     const end = Math.max(currentIdx, destIdx);
@@ -63,8 +74,16 @@ export default function HomeScreen() {
     return { text: '● Alarm armed', color: badgeColors.tracking };
   }, [computedStationsRemaining, alarmThreshold]);
 
+  // Human-readable travel direction indicator.
+  const directionLabel = useMemo(() => {
+    if (direction === 'increasing') return 'HEADING ↑';
+    if (direction === 'decreasing') return 'HEADING ↓';
+    return isTracking ? 'DETECTING DIRECTION…' : null;
+  }, [direction, isTracking]);
+
   const { animatedStyle: counterAnimStyle } = useAnimatedCounter(computedStationsRemaining);
   const pulseStyle = usePulse(true);
+  const livePulseStyle = usePulse(!!nearestStation);
   const { animatedStyle: startPressStyle, onPressIn: startPressIn, onPressOut: startPressOut } = useSpringPress(0.95);
   const { animatedStyle: stopPressStyle, onPressIn: stopPressIn, onPressOut: stopPressOut } = useSpringPress(0.95);
   const badgeSlideStyle = useSlideTransition(isTracking, { from: 'top', distance: 12 });
@@ -83,29 +102,33 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <PageHeader title="tiba" right={trackingBadge} />
 
-      {/* Content based on state */}
-      {!isTracking && !destination ? (
-        /* State (a): Not tracking, no destination */
-        <View style={styles.noStationContainer}>
-          <Text style={styles.noStation}>No station detected</Text>
-        </View>
-      ) : !destination && isTracking ? (
-        /* State (b): Tracking, no destination */
-        <View style={styles.currentStationCard}>
-          {nearestStation && (
-            <>
-              <Text style={styles.stationNameLarge}>{nearestStation.name.toUpperCase()}</Text>
+      {/* Current position + line — always visible */}
+      <View style={styles.positionCard}>
+        <Text style={styles.positionLabel}>CURRENT POSITION</Text>
+        {nearestStation ? (
+          <>
+            <Text style={styles.stationNameLarge}>{nearestStation.name.toUpperCase()}</Text>
+            <View style={styles.metaRow}>
               {currentLine && (
                 <View style={styles.lineBadge}>
-                  <View style={[styles.lineDot, { backgroundColor: currentLine.color }]} />
+                  <Animated.View style={livePulseStyle}>
+                    <View style={[styles.lineDot, { backgroundColor: currentLine.color }]} />
+                  </Animated.View>
                   <Text style={styles.lineText}>{currentLine.name.toUpperCase()}</Text>
                 </View>
               )}
-            </>
-          )}
-        </View>
-      ) : destination ? (
-        /* States (c), (d), (e): Destination is set */
+              {directionLabel && <Text style={styles.directionText}>{directionLabel}</Text>}
+            </View>
+          </>
+        ) : (
+          <Text style={styles.noStation}>
+            {isTracking ? 'Locating…' : 'Enable location to detect your station'}
+          </Text>
+        )}
+      </View>
+
+      {/* Trip details when a destination is armed */}
+      {destination ? (
         <>
           {/* Stations Counter Section */}
           <View style={styles.counterSection}>
@@ -140,7 +163,6 @@ export default function HomeScreen() {
 
           {/* Route Timeline Section */}
           {currentLine && direction && routeStations.length > 0 ? (
-            /* State (d): Full route timeline */
             <View style={styles.routeSection}>
               <Text style={styles.routeLabel}>YOUR ROUTE</Text>
               <ScrollView style={styles.routeTimeline} showsVerticalScrollIndicator={false}>
@@ -174,13 +196,22 @@ export default function HomeScreen() {
               </ScrollView>
             </View>
           ) : (
-            /* State (c): Direction unknown, show placeholder */
             <View style={styles.routeSection}>
-              <Text style={styles.directionPending}>Detecting direction…</Text>
+              <Text style={styles.directionPending}>
+                {isTracking ? 'Detecting direction…' : 'Start tracking to map your route'}
+              </Text>
             </View>
           )}
         </>
-      ) : null}
+      ) : (
+        /* No destination armed yet */
+        <View style={styles.noDestinationContainer}>
+          <Text style={styles.noDestinationTitle}>No destination armed</Text>
+          <Pressable onPress={() => router.push('/(tabs)/alarm')} style={styles.setDestinationButton}>
+            <Text style={styles.setDestinationText}>SET DESTINATION →</Text>
+          </Pressable>
+        </View>
+      )}
 
       {/* Bottom Button */}
       {isTracking ? (
@@ -234,25 +265,34 @@ const styles = StyleSheet.create({
     color: badgeColors.tracking,
     letterSpacing: 1,
   },
-  noStationContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  positionCard: {
+    paddingBottom: spacing.xl,
+    borderBottomWidth: 1,
+    borderBottomColor: borderColors.subtle,
   },
-  noStation: {
-    fontFamily: fonts.regular,
-    fontSize: fontSize.xl,
-    color: colors.monoGray2,
-  },
-  currentStationCard: {
-    flex: 1,
-    justifyContent: 'center',
+  positionLabel: {
+    fontFamily: fonts.bold,
+    fontSize: fontSize.md,
+    color: '#999999',
+    letterSpacing: 1.5,
+    marginBottom: spacing.sm,
   },
   stationNameLarge: {
     fontFamily: fonts.bold,
     fontSize: fontSize.display,
     color: colors.monoFg,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  noStation: {
+    fontFamily: fonts.regular,
+    fontSize: fontSize.lg,
+    color: colors.monoGray2,
+    marginTop: spacing.sm,
   },
   lineBadge: {
     flexDirection: 'row',
@@ -268,6 +308,12 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: fontSize.md,
     color: colors.monoFg,
+    letterSpacing: 1,
+  },
+  directionText: {
+    fontFamily: fonts.bold,
+    fontSize: fontSize.sm,
+    color: colors.monoAccent,
     letterSpacing: 1,
   },
   counterSection: {
@@ -411,6 +457,29 @@ const styles = StyleSheet.create({
     color: colors.monoGray2,
     textAlign: 'center',
     paddingVertical: spacing.xl,
+  },
+  noDestinationContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.lg,
+  },
+  noDestinationTitle: {
+    fontFamily: fonts.regular,
+    fontSize: fontSize.lg,
+    color: colors.monoGray2,
+  },
+  setDestinationButton: {
+    borderWidth: 1,
+    borderColor: borderColors.subtle,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  setDestinationText: {
+    fontFamily: fonts.bold,
+    fontSize: fontSize.md,
+    color: colors.monoAccent,
+    letterSpacing: 1.5,
   },
   buttonStart: {
     backgroundColor: colors.monoAccent,

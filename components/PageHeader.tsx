@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts, fontSize, spacing } from '../lib/theme';
 
 interface PageHeaderProps {
@@ -7,8 +8,9 @@ interface PageHeaderProps {
 }
 
 export default function PageHeader({ title, right }: PageHeaderProps) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { paddingTop: insets.top + spacing.xl }]}>
       <Text style={styles.title}>{title}</Text>
       {right && <View style={styles.right}>{right}</View>}
     </View>
@@ -20,7 +22,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 72,
     paddingHorizontal: spacing.xl,
     paddingBottom: spacing.xxl,
   },

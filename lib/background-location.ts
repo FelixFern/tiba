@@ -2,9 +2,23 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
-import { updateNearestStation, updateDirectionDetection } from './location';
+import {
+  updateNearestStation,
+  updateDirectionDetection,
+  startForegroundTracking,
+  stopForegroundTracking,
+  resetDetectionState,
+} from './location';
 import { useTibaStore, Position, Station, LineId } from './store';
 import { checkAlarmTrigger } from './alarm';
+import { isExpoGo } from './env';
+import {
+  LIVE_NOTIFICATION_ID,
+  LIVE_CHANNEL_ID,
+  ALARM_CHANNEL_ID,
+  LIVE_CATEGORY_ID,
+  ACTION_STOP,
+} from './notifications';
 import { Platform } from 'react-native';
 
 // ============================================================================
@@ -81,32 +95,76 @@ export async function updateLiveNotification(
   stationsRemaining: number | null
 ): Promise<void> {
   try {
-    let title = 'Tiba · Tracking';
+    const lineName = useTibaStore.getState().currentLine?.name?.toUpperCase();
+
+    // Default (still locating).
+    let title = 'tiba · tracking';
     let body = 'Detecting location…';
+    let subtitle: string | undefined;
 
     if (station && destination) {
+      // Matches design screen 04: "Citayam → Bogor" / "3 stations left · alarm armed".
       title = `${station.name} → ${destination.name}`;
       if (stationsRemaining !== null) {
-        body = `${stationsRemaining} ${stationsRemaining === 1 ? 'station' : 'stations'} left · alarm armed`;
+        body =
+          stationsRemaining === 0
+            ? 'Arriving now · prepare to alight'
+            : `${stationsRemaining} ${stationsRemaining === 1 ? 'station' : 'stations'} left · alarm armed`;
       } else {
-        body = 'Tracking · detecting distance';
+        body = 'Alarm armed · detecting distance';
       }
+      subtitle = lineName;
     } else if (station) {
-      const lineName = useTibaStore.getState().currentLine?.name ?? 'Unknown line';
-      body = `Near ${station.name} · ${lineName}`;
+      title = station.name;
+      body = lineName ? `Near ${station.name} · ${lineName}` : `Near ${station.name}`;
     }
 
+    // Re-using a stable identifier means each update replaces the single ongoing
+    // notification instead of stacking a new one. The channelId trigger delivers
+    // it immediately on the silent live channel.
     await Notifications.scheduleNotificationAsync({
-      content: { title, body, data: { persistent: true }, priority: Notifications.AndroidNotificationPriority.DEFAULT },
-      trigger: null,
+      identifier: LIVE_NOTIFICATION_ID,
+      content: {
+        title,
+        subtitle,
+        body,
+        data: { persistent: true },
+        categoryIdentifier: LIVE_CATEGORY_ID,
+        color: NOTIFICATION_COLOR,
+        sticky: true,
+        autoDismiss: false,
+        priority: Notifications.AndroidNotificationPriority.DEFAULT,
+      },
+      trigger: { channelId: LIVE_CHANNEL_ID },
     });
   } catch (error) {
     // Silently fail
   }
 }
 
+/**
+ * Dismiss the persistent live-tracking notification.
+ */
+export async function clearLiveNotification(): Promise<void> {
+  try {
+    await Notifications.dismissNotificationAsync(LIVE_NOTIFICATION_ID);
+    await Notifications.cancelScheduledNotificationAsync(LIVE_NOTIFICATION_ID);
+  } catch {
+    // ignore
+  }
+}
+
 Notifications.addNotificationResponseReceivedListener((response) => {
-  const isAlarmNotification = response.notification.request.content.data?.alarm === true;
+  const { actionIdentifier, notification } = response;
+
+  // "Stop" action on the live notification ends tracking.
+  if (actionIdentifier === ACTION_STOP) {
+    void stopBackgroundTracking();
+    return;
+  }
+
+  // Tapping the alarm (or its body) opens the full-screen alarm.
+  const isAlarmNotification = notification.request.content.data?.alarm === true;
   if (isAlarmNotification) {
     router.push('/alarm-trigger');
   }
@@ -140,9 +198,6 @@ TaskManager.defineTask<LocationTaskData>(
       };
 
       try {
-        const state = useTibaStore.getState();
-        const previousStation = state.nearestStation;
-
         useTibaStore.setState({ currentPosition: position });
 
         updateNearestStation(position);
@@ -185,10 +240,11 @@ TaskManager.defineTask<LocationTaskData>(
 
             await Notifications.scheduleNotificationAsync({
               content: {
-                title: `ALARM: ${destination.name}`,
+                title: `ARRIVING: ${destination.name}`,
                 body: `${stationsRemaining} ${stationsRemaining === 1 ? 'station' : 'stations'} remaining · prepare to alight`,
                 sound: true,
                 data: { alarm: true },
+                color: NOTIFICATION_COLOR,
                 priority: Notifications.AndroidNotificationPriority.MAX,
                 ...Platform.select({
                   ios: {
@@ -196,7 +252,7 @@ TaskManager.defineTask<LocationTaskData>(
                   },
                 }),
               },
-              trigger: null,
+              trigger: { channelId: ALARM_CHANNEL_ID },
             });
           }
         }
@@ -224,6 +280,14 @@ TaskManager.defineTask<LocationTaskData>(
  */
 export async function startBackgroundTracking(): Promise<void> {
   try {
+    // Expo Go can't run the background TaskManager location service, so fall
+    // back to foreground watching there. This keeps the full flow usable for
+    // UI slicing; a dev/prod build gets the real background service.
+    if (isExpoGo) {
+      await startForegroundTracking();
+      return;
+    }
+
     const foregroundStatus = await Location.getForegroundPermissionsAsync();
     if (!foregroundStatus.granted) {
       const foregroundRequest = await Location.requestForegroundPermissionsAsync();
@@ -245,11 +309,16 @@ export async function startBackgroundTracking(): Promise<void> {
       return;
     }
 
+    resetDetectionState();
+
+    // Tighter cadence than before (was 50m / Balanced) for snappier station and
+    // direction updates while still being battery-reasonable for a train ride.
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-      accuracy: Location.Accuracy.Balanced,
-      distanceInterval: 50,
+      accuracy: Location.Accuracy.High,
+      timeInterval: 5000,
+      distanceInterval: 20,
       foregroundService: {
-        notificationTitle: 'Tiba · Tracking',
+        notificationTitle: 'tiba · tracking',
         notificationBody: 'Detecting location…',
         notificationColor: NOTIFICATION_COLOR,
       },
@@ -278,13 +347,20 @@ export async function startBackgroundTracking(): Promise<void> {
  */
 export async function stopBackgroundTracking(): Promise<void> {
   try {
-    const isRegistered = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-    if (isRegistered) {
-      await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+    if (isExpoGo) {
+      stopForegroundTracking();
+    } else {
+      const isRegistered = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
+      if (isRegistered) {
+        await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+      }
     }
+
+    await clearLiveNotification();
 
     lastNotifiedStationId = null;
     lastAlarmStationId = null;
+    resetDetectionState();
 
     useTibaStore.setState({ isTracking: false });
   } catch (error) {

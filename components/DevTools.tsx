@@ -26,7 +26,6 @@ export default function DevTools() {
   const isTracking = useTibaStore((s) => s.isTracking);
   const hasLocationPermission = useTibaStore((s) => s.hasLocationPermission);
   const alarmThreshold = useTibaStore((s) => s.alarmThreshold);
-  const stationHistory = useTibaStore((s) => s.stationHistory);
 
   const nearestWithDistance = useMemo(() => {
     if (!currentPosition) return null;
@@ -85,16 +84,6 @@ export default function DevTools() {
         <Row label="destination" value={destination ? `${destination.name} [${destination.id}]` : null} />
         <Row label="remaining" value={stationsRemaining !== null ? `${stationsRemaining} stations` : null} />
         <Row label="threshold" value={`${alarmThreshold} stations`} />
-
-        {/* History */}
-        <Text style={styles.section}>STATION HISTORY</Text>
-        {stationHistory.length > 0 ? (
-          stationHistory.slice(0, 5).map((s, i) => (
-            <Row key={`${s.id}-${i}`} label={`[${i}]`} value={`${s.name} (${s.id})`} />
-          ))
-        ) : (
-          <Row label="history" value="empty" />
-        )}
       </ScrollView>
     </View>
   );

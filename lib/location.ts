@@ -3,7 +3,7 @@ import { findNearestStations, StationWithDistance } from './distance';
 import { getAllStations, getLineById } from './data';
 import { useTibaStore, Position } from './store';
 import { Station, LineId } from './types';
-import { detectDirection, inferLineFromStation } from './direction';
+import { predictDirection, inferLineFromStation } from './direction';
 
 // ============================================================================
 // Types
@@ -49,8 +49,13 @@ export async function requestLocationPermissions(): Promise<boolean> {
 // ============================================================================
 
 /**
- * Update the nearest station based on current position
- * Calls findNearestStations, checks if distance <200m
+ * Update the nearest station based on current position.
+ *
+ * Always reports the closest station (no distance gate), so the UI consistently
+ * shows where the user is along the line rather than blanking out between
+ * stations. The measured distance is kept in the store so callers can still
+ * distinguish "at" a station from merely "nearest to" one.
+ *
  * @param position Current position {lat, lon}
  */
 export function updateNearestStation(position: Position): void {
@@ -63,30 +68,69 @@ export function updateNearestStation(position: Position): void {
       1
     );
 
-    if (nearestStations.length > 0) {
-      const nearest: StationWithDistance = nearestStations[0];
-      const STATION_THRESHOLD = 200; // meters
-
-      if (nearest.distance < STATION_THRESHOLD) {
-        // Extract Station properties (exclude distance)
-        const station: Station = {
-          id: nearest.id,
-          name: nearest.name,
-          lat: nearest.lat,
-          lon: nearest.lon,
-          lines: nearest.lines,
-          sequences: nearest.sequences,
-        };
-        useTibaStore.setState({ nearestStation: station });
-      } else {
-        useTibaStore.setState({ nearestStation: null });
-      }
-    } else {
-      useTibaStore.setState({ nearestStation: null });
+    if (nearestStations.length === 0) {
+      return;
     }
+
+    const nearest: StationWithDistance = nearestStations[0];
+    const station: Station = {
+      id: nearest.id,
+      name: nearest.name,
+      lat: nearest.lat,
+      lon: nearest.lon,
+      lines: nearest.lines,
+      sequences: nearest.sequences,
+    };
+
+    // Always keep the current line in sync with the nearest station, inferring
+    // from line history for multi-line hubs, so the UI can show it at all times
+    // (even before enough movement has resolved a travel direction).
+    const inferredLine = getLineById(inferLineFromStation(station, lineHistory));
+
+    useTibaStore.setState({
+      nearestStation: station,
+      currentLine: inferredLine ?? useTibaStore.getState().currentLine,
+    });
   } catch (error) {
     console.error('Error updating nearest station:', error);
   }
+}
+
+/**
+ * Take a single location reading and update the nearest station / line.
+ *
+ * Used to populate "current position" on screen load without starting a full
+ * tracking session, so the home screen can always show where the user is.
+ * No-op if foreground permission hasn't been granted.
+ */
+export async function refreshCurrentLocationOnce(): Promise<void> {
+  try {
+    const { granted } = await Location.getForegroundPermissionsAsync();
+    if (!granted) return;
+
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    const position: Position = {
+      lat: location.coords.latitude,
+      lon: location.coords.longitude,
+    };
+
+    useTibaStore.setState({ currentPosition: position });
+    updateNearestStation(position);
+    updateDirectionDetection();
+  } catch (error) {
+    // Best-effort only.
+  }
+}
+
+/**
+ * Reset the in-memory station/line history used for direction prediction.
+ * Call when (re)starting tracking so a stale buffer doesn't leak into a new trip.
+ */
+export function resetDetectionState(): void {
+  detectedStations = [];
+  lineHistory = [];
 }
 
 // ============================================================================
@@ -113,11 +157,16 @@ export async function startForegroundTracking(): Promise<void> {
       return;
     }
 
-    // Start watching position
+    // Fresh trip — clear any stale direction history.
+    resetDetectionState();
+
+    // Start watching position. Tighter cadence + higher accuracy so the nearest
+    // station and predicted direction stay responsive as the train moves.
     locationSubscription = await Location.watchPositionAsync(
       {
-        accuracy: Location.Accuracy.Balanced,
-        distanceInterval: 50, // meters
+        accuracy: Location.Accuracy.High,
+        timeInterval: 3000, // ms
+        distanceInterval: 15, // meters
       },
       (location) => {
         const position: Position = {
@@ -128,8 +177,9 @@ export async function startForegroundTracking(): Promise<void> {
         // Update current position in store
         useTibaStore.setState({ currentPosition: position });
 
-        // Update nearest station detection
+        // Update nearest station, then refine line + direction prediction.
         updateNearestStation(position);
+        updateDirectionDetection();
       }
     );
 
@@ -154,6 +204,7 @@ export function stopForegroundTracking(): void {
       locationSubscription.remove();
       locationSubscription = null;
     }
+    resetDetectionState();
     useTibaStore.setState({ isTracking: false });
   } catch (error) {
     console.error('Error stopping location tracking:', error);
@@ -184,26 +235,25 @@ export function updateDirectionDetection(): void {
       return;
     }
 
-    // Add station to circular buffer (max 3 stations)
-    detectedStations.unshift(nearestStation);
-    if (detectedStations.length > 3) {
-      detectedStations.pop();
+    // Only record a new sample when the nearest station actually changes —
+    // repeated identical samples would otherwise swamp the buffer and prevent
+    // a direction from ever resolving.
+    const lastDetected = detectedStations[0];
+    if (!lastDetected || lastDetected.id !== nearestStation.id) {
+      detectedStations.unshift(nearestStation);
+      if (detectedStations.length > 5) {
+        detectedStations.pop();
+      }
+
+      for (const line of nearestStation.lines) {
+        lineHistory.unshift(line);
+      }
+      if (lineHistory.length > 6) {
+        lineHistory.length = 6;
+      }
     }
 
-    // Track line from this station
-    for (const line of nearestStation.lines) {
-      lineHistory.unshift(line);
-    }
-    if (lineHistory.length > 3) {
-      lineHistory.pop();
-    }
-
-    // Need at least one station to infer a line
-    if (detectedStations.length === 0) {
-      return;
-    }
-
-    // Infer current line from most recent station and line history
+    // Infer current line from most recent station and line history.
     const inferredLineId = inferLineFromStation(nearestStation, lineHistory);
     const inferredLine = getLineById(inferredLineId);
 
@@ -211,13 +261,13 @@ export function updateDirectionDetection(): void {
       return;
     }
 
-    // Detect direction using station history and inferred line
-    const direction = detectDirection(detectedStations, inferredLine);
+    // Predict direction; keep the last known direction if not yet determinable
+    // (e.g. only one distinct station so far) so the UI doesn't flicker to null.
+    const predicted = predictDirection(detectedStations, inferredLine);
 
-    // Update store with inferred line and detected direction
     useTibaStore.setState({
       currentLine: inferredLine,
-      direction,
+      direction: predicted ?? state.direction,
     });
   } catch (error) {
     console.error('Error updating direction detection:', error);
