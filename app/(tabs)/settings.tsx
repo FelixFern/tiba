@@ -1,24 +1,17 @@
 import Constants from 'expo-constants';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { useEffect, useState } from 'react';
-import {
-  Alert,
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View
-} from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useTibaStore } from '../../lib/store';
 import { storage } from '../../lib/storage';
-import { badgeColors, borderColors, colors, fontSize, fonts, spacing } from '../../lib/theme';
+import { badgeColors, fontSize, fonts, spacing, type Theme } from '../../lib/theme';
+import { useTheme } from '../../lib/use-theme';
 import { useSpringPress } from '../../lib/animations';
 import PageHeader from '../../components/PageHeader';
 
-function AnimatedButton({
+function AnimatedPressable({
   onPress,
   disabled,
   style,
@@ -45,11 +38,34 @@ function AnimatedButton({
   );
 }
 
-export default function SettingsScreen() {
-  const [locationStatus, setLocationStatus] = useState<'granted' | 'denied'>('denied');
-  const [notificationStatus, setNotificationStatus] = useState<'granted' | 'denied'>(
-    'denied'
+function GrantedPill() {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  return (
+    <View style={styles.grantedPill}>
+      <View style={styles.grantedDot} />
+      <Text style={styles.grantedText}>GRANTED</Text>
+    </View>
   );
+}
+
+function EnableButton({ onPress, disabled }: { onPress: () => void; disabled?: boolean }) {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  return (
+    <AnimatedPressable onPress={onPress} disabled={disabled} style={styles.enableButton}>
+      <Text style={styles.enableButtonText}>ENABLE</Text>
+    </AnimatedPressable>
+  );
+}
+
+export default function SettingsScreen() {
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const themePref = useTibaStore((s) => s.themePref);
+  const setThemePref = useTibaStore((s) => s.setThemePref);
+  const [locationStatus, setLocationStatus] = useState<'granted' | 'denied'>('denied');
+  const [notificationStatus, setNotificationStatus] = useState<'granted' | 'denied'>('denied');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -128,207 +144,301 @@ export default function SettingsScreen() {
   const version = Constants.expoConfig?.version || '1.0.0';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <PageHeader title="SETTINGS" />
+    <View style={styles.container}>
+      <PageHeader title="Settings" />
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-      {/* PERMISSIONS SECTION */}
+      {/* PERMISSIONS */}
       <Text style={styles.sectionLabel}>PERMISSIONS</Text>
-
-      {/* Location Row */}
-      <View style={styles.permissionRow}>
-        <View style={styles.permissionLeft}>
-          <Text style={styles.permissionLabel}>Location</Text>
-          <Text style={styles.permissionDescription}>Always · background tracking</Text>
-        </View>
-        <View style={styles.permissionRight}>
+      <View style={styles.card}>
+        <View style={[styles.permissionRow, styles.rowDivider]}>
+          <View style={styles.permissionLeft}>
+            <Text style={styles.permissionLabel}>Location</Text>
+            <Text style={styles.permissionDescription}>Always · background tracking</Text>
+          </View>
           {locationStatus === 'granted' ? (
-            <Text style={styles.grantedBadge}>● GRANTED</Text>
+            <GrantedPill />
           ) : (
-            <AnimatedButton onPress={handleRequestLocation} disabled={isLoading}>
-              <Text style={styles.enableButton}>ENABLE</Text>
-            </AnimatedButton>
+            <EnableButton onPress={handleRequestLocation} disabled={isLoading} />
           )}
         </View>
-      </View>
 
-      {/* Notifications Row */}
-      <View style={styles.permissionRow}>
-        <View style={styles.permissionLeft}>
-          <Text style={styles.permissionLabel}>Notifications</Text>
-          <Text style={styles.permissionDescription}>Alarms & live updates</Text>
-        </View>
-        <View style={styles.permissionRight}>
+        <View style={[styles.permissionRow, styles.rowDivider]}>
+          <View style={styles.permissionLeft}>
+            <Text style={styles.permissionLabel}>Notifications</Text>
+            <Text style={styles.permissionDescription}>Alarms & live updates</Text>
+          </View>
           {notificationStatus === 'granted' ? (
-            <Text style={styles.grantedBadge}>● GRANTED</Text>
+            <GrantedPill />
           ) : (
-            <AnimatedButton onPress={handleRequestNotification} disabled={isLoading}>
-              <Text style={styles.enableButton}>ENABLE</Text>
-            </AnimatedButton>
+            <EnableButton onPress={handleRequestNotification} disabled={isLoading} />
           )}
         </View>
-      </View>
 
-      {/* Precise Location Row */}
-      <View style={styles.permissionRow}>
-        <View style={styles.permissionLeft}>
-          <Text style={styles.permissionLabel}>Precise location</Text>
-          <Text style={styles.permissionDescription}>Improves station accuracy</Text>
-        </View>
-        <View style={styles.permissionRight}>
-          <AnimatedButton onPress={handlePreciseLocation}>
-            <Text style={styles.enableButton}>■ ENABLE</Text>
-          </AnimatedButton>
+        <View style={styles.permissionRow}>
+          <View style={styles.permissionLeft}>
+            <Text style={styles.permissionLabel}>Precise location</Text>
+            <Text style={styles.permissionDescription}>Improves station accuracy</Text>
+          </View>
+          <EnableButton onPress={handlePreciseLocation} />
         </View>
       </View>
 
-      {/* ABOUT SECTION */}
+      {/* APPEARANCE */}
+      <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>APPEARANCE</Text>
+      <View style={styles.segmented}>
+        {(['light', 'dark', 'system'] as const).map((pref) => {
+          const active = themePref === pref;
+          return (
+            <Pressable
+              key={pref}
+              onPress={() => setThemePref(pref)}
+              style={[styles.segment, active && styles.segmentActive]}
+            >
+              <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
+                {pref.toUpperCase()}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {/* ABOUT */}
       <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>ABOUT</Text>
-      
-      <View style={styles.aboutRow}>
+      <View style={styles.card}>
         <View style={styles.aboutHeader}>
-          <Text style={styles.blueDot}>●</Text>
-          <Text style={styles.appName}>tiba</Text>
+          <View style={styles.appIcon}>
+            <Text style={styles.appIconText}>t</Text>
+          </View>
+          <View>
+            <Text style={styles.appName}>tiba</Text>
+            <Text style={styles.versionText}>v{version} · KRL Jabodetabek alarm</Text>
+          </View>
         </View>
-        <Text style={styles.versionText}>v{version} · KRL Jabodetabek alarm</Text>
-      </View>
 
-      <View style={styles.offlineRow}>
-        <Text style={styles.greenDot}>●</Text>
-        <Text style={styles.offlineText}>All features work offline</Text>
-      </View>
+        <View style={styles.cardDivider} />
 
-      <View style={styles.dataSourceRow}>
+        <View style={styles.offlineRow}>
+          <View style={styles.greenDot} />
+          <Text style={styles.offlineText}>All features work offline</Text>
+        </View>
         <Text style={styles.dataSourceText}>
-          Station data: Indonesian Ministry of Transportation, Wikipedia, OpenStreetMap. No accounts, no servers, no telemetry.
+          Station data: Indonesian Ministry of Transportation, Wikipedia, OpenStreetMap. No
+          accounts, no servers, no telemetry.
         </Text>
       </View>
 
-      {/* CLEAR DATA ACTION */}
-      <AnimatedButton onPress={handleClearData} style={styles.clearDataAction}>
-        <Text style={styles.clearDataText}>CLEAR SAVED TRIP DATA</Text>
-      </AnimatedButton>
-    </ScrollView>
+      {/* CLEAR DATA */}
+      <AnimatedPressable onPress={handleClearData} style={styles.clearButton}>
+        <Text style={styles.clearText}>CLEAR SAVED TRIP DATA</Text>
+      </AnimatedPressable>
+      </ScrollView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.monoBg,
+    backgroundColor: t.bg,
   },
-  contentContainer: {
-    paddingBottom: spacing.xl,
+  content: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
   sectionLabel: {
-    fontFamily: fonts.regular,
-    fontSize: fontSize.md,
-    color: '#999999',
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
-    paddingHorizontal: spacing.xl,
-    marginBottom: spacing.md,
+    fontFamily: fonts.bold,
+    fontSize: fontSize.sm,
+    color: t.textMuted,
+    letterSpacing: 1.8,
+    marginBottom: 10,
   },
   sectionLabelSpaced: {
-    marginTop: spacing.xxl,
+    marginTop: spacing.xl,
   },
+  segmented: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: t.border,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentActive: {
+    backgroundColor: t.accent,
+  },
+  segmentText: {
+    fontFamily: fonts.bold,
+    fontSize: fontSize.sm,
+    color: t.textMuted,
+    letterSpacing: 1.4,
+  },
+  segmentTextActive: {
+    color: '#0A0A0A',
+  },
+
+  // Cards
+  card: {
+    borderWidth: 1,
+    borderColor: t.border,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+
+  // Permission rows
   permissionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: 14,
+    justifyContent: 'space-between',
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+  },
+  rowDivider: {
     borderBottomWidth: 1,
-    borderBottomColor: borderColors.subtle,
+    borderBottomColor: t.divider,
   },
   permissionLeft: {
     flex: 1,
+    marginRight: spacing.lg,
   },
   permissionLabel: {
     fontFamily: fonts.bold,
-    fontSize: fontSize.body,
-    color: colors.monoFg,
-    marginBottom: 4,
+    fontSize: fontSize.body + 1,
+    color: t.fg,
+    marginBottom: 3,
   },
   permissionDescription: {
     fontFamily: fonts.regular,
-    fontSize: fontSize.sm,
-    color: '#999999',
+    fontSize: fontSize.sm + 1,
+    color: t.textMuted,
   },
-  permissionRight: {
-    marginLeft: spacing.lg,
+
+  // Granted pill
+  grantedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: badgeColors.granted,
+    borderRadius: 2,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
-  grantedBadge: {
+  grantedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: badgeColors.granted,
+  },
+  grantedText: {
     fontFamily: fonts.bold,
     fontSize: fontSize.sm,
     color: badgeColors.granted,
-    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
+
+  // Enable filled button
   enableButton: {
+    height: 28,
+    paddingHorizontal: 12,
+    backgroundColor: t.accent,
+    borderRadius: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  enableButtonText: {
     fontFamily: fonts.bold,
     fontSize: fontSize.sm,
-    color: badgeColors.enable,
-    textTransform: 'uppercase',
+    color: '#0A0A0A',
+    letterSpacing: 1,
   },
-  aboutRow: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-  },
+
+  // About card
   aboutHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    gap: 13,
+    padding: 16,
+    paddingBottom: spacing.md,
   },
-  blueDot: {
-    fontSize: fontSize.lg,
-    color: badgeColors.enable,
-    marginRight: spacing.sm,
+  appIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 8,
+    backgroundColor: t.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  appIconText: {
+    fontFamily: fonts.bold,
+    fontSize: 24,
+    color: '#0A0A0A',
   },
   appName: {
     fontFamily: fonts.bold,
-    fontSize: fontSize.lg,
-    color: colors.monoFg,
+    fontSize: fontSize.lg + 3,
+    color: t.fg,
+    letterSpacing: -0.5,
   },
   versionText: {
     fontFamily: fonts.regular,
-    fontSize: fontSize.sm,
-    color: '#999999',
+    fontSize: fontSize.sm + 1,
+    color: t.textMuted,
+    marginTop: 2,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: t.divider,
+    marginHorizontal: 16,
   },
   offlineRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm,
+    gap: 9,
+    paddingHorizontal: 16,
+    paddingTop: spacing.lg,
   },
   greenDot: {
-    fontSize: spacing.sm,
-    color: badgeColors.tracking,
-    marginRight: spacing.sm,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: badgeColors.tracking,
   },
   offlineText: {
-    fontFamily: fonts.regular,
-    fontSize: fontSize.sm,
-    color: '#999999',
-  },
-  dataSourceRow: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm,
+    fontFamily: fonts.bold,
+    fontSize: fontSize.md,
+    color: t.fg,
   },
   dataSourceText: {
     fontFamily: fonts.regular,
-    fontSize: fontSize.sm,
-    color: '#999999',
-    lineHeight: 16,
+    fontSize: fontSize.sm + 1,
+    color: t.textDim,
+    lineHeight: 17,
+    paddingHorizontal: 16,
+    paddingTop: spacing.md,
+    paddingBottom: 18,
   },
-  clearDataAction: {
-    marginTop: spacing.xxl,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+
+  // Clear data
+  clearButton: {
+    marginTop: spacing.xl,
+    height: 50,
+    borderWidth: 1,
+    borderColor: t.dangerBorder,
+    borderRadius: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  clearDataText: {
+  clearText: {
     fontFamily: fonts.bold,
     fontSize: fontSize.md,
-    color: colors.monoDanger,
-    textTransform: 'uppercase',
-    letterSpacing: 1.5,
+    color: t.danger,
+    letterSpacing: 1.4,
   },
 });

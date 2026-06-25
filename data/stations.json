@@ -2,593 +2,899 @@
   {
     "id": "JAKK",
     "name": "Jakarta Kota",
-    "lat": -6.1375,
-    "lon": 106.8139,
-    "lines": ["bogor", "tanjungpriok"],
-    "sequences": { "bogor": 1, "tanjungpriok": 1 }
+    "lat": -6.137583,
+    "lon": 106.81462,
+    "lines": [
+      "bogor",
+      "tanjungpriok"
+    ],
+    "sequences": {
+      "bogor": 1,
+      "tanjungpriok": 1
+    }
   },
   {
     "id": "JAY",
     "name": "Jayakarta",
-    "lat": -6.1417,
-    "lon": 106.8144,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 2 }
+    "lat": -6.1413,
+    "lon": 106.823132,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 2
+    }
   },
   {
     "id": "MGB",
     "name": "Mangga Besar",
-    "lat": -6.1497,
-    "lon": 106.8147,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 3 }
+    "lat": -6.149804,
+    "lon": 106.826983,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 3
+    }
   },
   {
     "id": "SWB",
     "name": "Sawah Besar",
-    "lat": -6.1608,
-    "lon": 106.8278,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 4 }
+    "lat": -6.160667,
+    "lon": 106.827655,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 4
+    }
   },
   {
     "id": "JUA",
     "name": "Juanda",
-    "lat": -6.1667,
-    "lon": 106.8306,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 5 }
+    "lat": -6.166675,
+    "lon": 106.830461,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 5
+    }
   },
   {
     "id": "GDD",
     "name": "Gondangdia",
-    "lat": -6.1856,
-    "lon": 106.8356,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 6 }
+    "lat": -6.185911,
+    "lon": 106.832566,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 6
+    }
   },
   {
     "id": "CKI",
     "name": "Cikini",
-    "lat": -6.1922,
-    "lon": 106.8406,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 7 }
+    "lat": -6.198505,
+    "lon": 106.84128,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 7
+    }
   },
   {
     "id": "MRI",
     "name": "Manggarai",
-    "lat": -6.2100,
-    "lon": 106.8503,
-    "lines": ["bogor", "cikarang"],
-    "sequences": { "bogor": 8, "cikarang": 8 }
+    "lat": -6.21017,
+    "lon": 106.849935,
+    "lines": [
+      "bogor",
+      "cikarang"
+    ],
+    "sequences": {
+      "bogor": 8,
+      "cikarang": 8
+    }
   },
   {
     "id": "TBT",
     "name": "Tebet",
-    "lat": -6.2264,
-    "lon": 106.8547,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 9 }
+    "lat": -6.226398,
+    "lon": 106.858439,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 9
+    }
   },
   {
     "id": "CWG",
     "name": "Cawang",
-    "lat": -6.2444,
-    "lon": 106.8583,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 10 }
+    "lat": -6.242552,
+    "lon": 106.85869,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 10
+    }
   },
   {
     "id": "DKA",
     "name": "Duren Kalibata",
-    "lat": -6.2556,
-    "lon": 106.8556,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 11 }
+    "lat": -6.255201,
+    "lon": 106.855167,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 11
+    }
   },
   {
     "id": "PMB",
     "name": "Pasar Minggu Baru",
-    "lat": -6.2644,
-    "lon": 106.8500,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 12 }
+    "lat": -6.262798,
+    "lon": 106.851796,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 12
+    }
   },
   {
     "id": "PSM",
     "name": "Pasar Minggu",
-    "lat": -6.2844,
-    "lon": 106.8444,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 13 }
+    "lat": -6.283332,
+    "lon": 106.844856,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 13
+    }
   },
   {
     "id": "TJB",
     "name": "Tanjung Barat",
-    "lat": -6.3083,
-    "lon": 106.8406,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 14 }
+    "lat": -6.308041,
+    "lon": 106.838949,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 14
+    }
   },
   {
     "id": "LNA",
     "name": "Lenteng Agung",
-    "lat": -6.3306,
-    "lon": 106.8361,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 15 }
+    "lat": -6.330308,
+    "lon": 106.834679,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 15
+    }
   },
   {
     "id": "UP",
     "name": "Universitas Pancasila",
-    "lat": -6.3389,
-    "lon": 106.8333,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 16 }
+    "lat": -6.339345,
+    "lon": 106.834263,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 16
+    }
   },
   {
     "id": "UI",
     "name": "Universitas Indonesia",
-    "lat": -6.3608,
-    "lon": 106.8311,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 17 }
+    "lat": -6.360431,
+    "lon": 106.831782,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 17
+    }
   },
   {
     "id": "POC",
     "name": "Pondok Cina",
-    "lat": -6.3689,
-    "lon": 106.8328,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 18 }
+    "lat": -6.369059,
+    "lon": 106.832084,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 18
+    }
   },
   {
     "id": "DPB",
     "name": "Depok Baru",
-    "lat": -6.3817,
-    "lon": 106.8331,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 19 }
+    "lat": -6.391129,
+    "lon": 106.821641,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 19
+    }
   },
   {
     "id": "DPK",
     "name": "Depok",
-    "lat": -6.3903,
-    "lon": 106.8175,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 20 }
+    "lat": -6.404826,
+    "lon": 106.817084,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 20
+    }
   },
   {
     "id": "CTA",
     "name": "Citayam",
-    "lat": -6.4478,
-    "lon": 106.8089,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 21 }
+    "lat": -6.448824,
+    "lon": 106.802362,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 21
+    }
   },
   {
     "id": "BJD",
     "name": "Bojong Gede",
-    "lat": -6.4900,
-    "lon": 106.7983,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 22 }
+    "lat": -6.493234,
+    "lon": 106.795025,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 22
+    }
   },
   {
     "id": "CLB",
     "name": "Cilebut",
-    "lat": -6.5267,
-    "lon": 106.7933,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 23 }
+    "lat": -6.530724,
+    "lon": 106.800688,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 23
+    }
   },
   {
     "id": "BOG",
     "name": "Bogor",
-    "lat": -6.5958,
-    "lon": 106.7908,
-    "lines": ["bogor"],
-    "sequences": { "bogor": 24 }
+    "lat": -6.594289,
+    "lon": 106.790769,
+    "lines": [
+      "bogor"
+    ],
+    "sequences": {
+      "bogor": 24
+    }
   },
   {
     "id": "KPB",
     "name": "Kampung Bandan",
-    "lat": -6.1381,
-    "lon": 106.8283,
-    "lines": ["cikarang", "tanjungpriok"],
-    "sequences": { "cikarang": 1, "tanjungpriok": 2 }
+    "lat": -6.132702,
+    "lon": 106.828487,
+    "lines": [
+      "cikarang",
+      "tanjungpriok"
+    ],
+    "sequences": {
+      "cikarang": 1,
+      "tanjungpriok": 2
+    }
   },
   {
     "id": "AK",
     "name": "Angke",
-    "lat": -6.1447,
-    "lon": 106.8022,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 2 }
+    "lat": -6.144737,
+    "lon": 106.800779,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 2
+    }
   },
   {
     "id": "DRI",
     "name": "Duri",
-    "lat": -6.1514,
-    "lon": 106.7758,
-    "lines": ["cikarang", "tangerang"],
-    "sequences": { "cikarang": 3, "tangerang": 1 }
+    "lat": -6.155276,
+    "lon": 106.801297,
+    "lines": [
+      "cikarang",
+      "tangerang"
+    ],
+    "sequences": {
+      "cikarang": 3,
+      "tangerang": 1
+    }
   },
   {
     "id": "THB",
     "name": "Tanah Abang",
-    "lat": -6.1856,
-    "lon": 106.8108,
-    "lines": ["cikarang", "rangkasbitung"],
-    "sequences": { "cikarang": 4, "rangkasbitung": 1 }
+    "lat": -6.185713,
+    "lon": 106.810894,
+    "lines": [
+      "cikarang",
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "cikarang": 4,
+      "rangkasbitung": 1
+    }
   },
   {
     "id": "KAT",
     "name": "Karet",
-    "lat": -6.1939,
-    "lon": 106.8200,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 5 }
+    "lat": -6.200954,
+    "lon": 106.81677,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 5
+    }
   },
   {
     "id": "BNI",
     "name": "BNI City",
-    "lat": -6.2014,
-    "lon": 106.8228,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 6 }
+    "lat": -6.201594,
+    "lon": 106.819717,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 6
+    }
   },
   {
     "id": "SUD",
     "name": "Sudirman",
-    "lat": -6.2022,
-    "lon": 106.8236,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 7 }
+    "lat": -6.202408,
+    "lon": 106.823449,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 7
+    }
   },
   {
     "id": "MTR",
     "name": "Matraman",
-    "lat": -6.2117,
-    "lon": 106.8592,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 9 }
+    "lat": -6.212567,
+    "lon": 106.859753,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 9
+    }
   },
   {
     "id": "JNG",
     "name": "Jatinegara",
-    "lat": -6.2150,
-    "lon": 106.8703,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 10 }
+    "lat": -6.214925,
+    "lon": 106.870339,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 10
+    }
   },
   {
     "id": "KLD",
     "name": "Klender",
-    "lat": -6.2156,
-    "lon": 106.8953,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 11 }
+    "lat": -6.213319,
+    "lon": 106.899413,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 11
+    }
   },
   {
     "id": "BUA",
     "name": "Buaran",
-    "lat": -6.2153,
-    "lon": 106.9053,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 12 }
+    "lat": -6.215606,
+    "lon": 106.92316,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 12
+    }
   },
   {
     "id": "KLDB",
     "name": "Klender Baru",
-    "lat": -6.2153,
-    "lon": 106.9125,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 13 }
+    "lat": -6.217659,
+    "lon": 106.940183,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 13
+    }
   },
   {
     "id": "CKG",
     "name": "Cakung",
-    "lat": -6.2122,
-    "lon": 106.9289,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 14 }
+    "lat": -6.219081,
+    "lon": 106.952479,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 14
+    }
   },
   {
     "id": "KRI",
     "name": "Kranji",
-    "lat": -6.2261,
-    "lon": 106.9522,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 15 }
+    "lat": -6.224513,
+    "lon": 106.979827,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 15
+    }
   },
   {
     "id": "BKS",
     "name": "Bekasi",
-    "lat": -6.2361,
-    "lon": 106.9992,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 16 }
+    "lat": -6.236214,
+    "lon": 106.998744,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 16
+    }
   },
   {
     "id": "BKST",
     "name": "Bekasi Timur",
-    "lat": -6.2361,
-    "lon": 107.0131,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 17 }
+    "lat": -6.246795,
+    "lon": 107.018105,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 17
+    }
   },
   {
     "id": "TB",
     "name": "Tambun",
-    "lat": -6.2411,
-    "lon": 107.0483,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 18 }
+    "lat": -6.25855,
+    "lon": 107.055804,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 18
+    }
   },
   {
     "id": "CIT",
     "name": "Cibitung",
-    "lat": -6.2600,
-    "lon": 107.0847,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 19 }
+    "lat": -6.261825,
+    "lon": 107.083798,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 19
+    }
   },
   {
     "id": "MTL",
     "name": "Metland Telagamurni",
-    "lat": -6.2736,
-    "lon": 107.1083,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 20 }
+    "lat": -6.257474,
+    "lon": 107.111227,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 20
+    }
   },
   {
     "id": "CKR",
     "name": "Cikarang",
-    "lat": -6.2597,
-    "lon": 107.1456,
-    "lines": ["cikarang"],
-    "sequences": { "cikarang": 21 }
+    "lat": -6.255314,
+    "lon": 107.145073,
+    "lines": [
+      "cikarang"
+    ],
+    "sequences": {
+      "cikarang": 21
+    }
   },
   {
     "id": "PLM",
     "name": "Palmerah",
-    "lat": -6.2069,
-    "lon": 106.7975,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 2 }
+    "lat": -6.20792,
+    "lon": 106.797232,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 2
+    }
   },
   {
     "id": "KBY",
     "name": "Kebayoran",
-    "lat": -6.2372,
-    "lon": 106.7828,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 3 }
+    "lat": -6.23723,
+    "lon": 106.782534,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 3
+    }
   },
   {
     "id": "PDR",
     "name": "Pondok Ranji",
-    "lat": -6.2756,
-    "lon": 106.7472,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 4 }
+    "lat": -6.276683,
+    "lon": 106.744693,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 4
+    }
   },
   {
     "id": "JMG",
     "name": "Jurangmangu",
-    "lat": -6.2861,
-    "lon": 106.7283,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 5 }
+    "lat": -6.288582,
+    "lon": 106.729146,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 5
+    }
   },
   {
     "id": "SDM",
     "name": "Sudimara",
-    "lat": -6.3050,
-    "lon": 106.7103,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 6 }
+    "lat": -6.296844,
+    "lon": 106.712647,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 6
+    }
   },
   {
     "id": "RWB",
     "name": "Rawa Buntu",
-    "lat": -6.3183,
-    "lon": 106.6822,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 7 }
+    "lat": -6.314884,
+    "lon": 106.676152,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 7
+    }
   },
   {
     "id": "SRP",
     "name": "Serpong",
-    "lat": -6.3208,
-    "lon": 106.6656,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 8 }
+    "lat": -6.320153,
+    "lon": 106.665584,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 8
+    }
   },
   {
     "id": "CSK",
     "name": "Cisauk",
-    "lat": -6.3258,
-    "lon": 106.6339,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 9 }
+    "lat": -6.324445,
+    "lon": 106.641626,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 9
+    }
   },
   {
     "id": "CCY",
     "name": "Cicayur",
-    "lat": -6.3278,
-    "lon": 106.6167,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 10 }
+    "lat": -6.329683,
+    "lon": 106.618971,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 10
+    }
   },
   {
     "id": "PPJ",
     "name": "Parung Panjang",
-    "lat": -6.3444,
-    "lon": 106.5669,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 11 }
+    "lat": -6.344344,
+    "lon": 106.569846,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 11
+    }
   },
   {
     "id": "CJT",
     "name": "Cilejit",
-    "lat": -6.3536,
-    "lon": 106.5333,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 12 }
+    "lat": -6.354265,
+    "lon": 106.509643,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 12
+    }
   },
   {
     "id": "DAR",
     "name": "Daru",
-    "lat": -6.3619,
-    "lon": 106.5167,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 13 }
+    "lat": -6.33797,
+    "lon": 106.492563,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 13
+    }
   },
   {
     "id": "TEJ",
     "name": "Tenjo",
-    "lat": -6.3703,
-    "lon": 106.4747,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 14 }
+    "lat": -6.327491,
+    "lon": 106.461765,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 14
+    }
   },
   {
     "id": "TGS",
     "name": "Tigaraksa",
-    "lat": -6.3542,
-    "lon": 106.4403,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 15 }
+    "lat": -6.328836,
+    "lon": 106.43406,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 15
+    }
   },
   {
     "id": "CKY",
     "name": "Cikoya",
-    "lat": -6.3500,
-    "lon": 106.4200,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 16 }
+    "lat": -6.335738,
+    "lon": 106.411655,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 16
+    }
   },
   {
     "id": "MJ",
     "name": "Maja",
-    "lat": -6.3514,
-    "lon": 106.3917,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 17 }
+    "lat": -6.332503,
+    "lon": 106.396479,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 17
+    }
   },
   {
     "id": "CTS",
     "name": "Citeras",
-    "lat": -6.3556,
-    "lon": 106.3389,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 18 }
+    "lat": -6.335058,
+    "lon": 106.332669,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 18
+    }
   },
   {
     "id": "RK",
     "name": "Rangkasbitung",
-    "lat": -6.3531,
-    "lon": 106.2500,
-    "lines": ["rangkasbitung"],
-    "sequences": { "rangkasbitung": 19 }
+    "lat": -6.352779,
+    "lon": 106.251525,
+    "lines": [
+      "rangkasbitung"
+    ],
+    "sequences": {
+      "rangkasbitung": 19
+    }
   },
   {
     "id": "GGL",
     "name": "Grogol",
-    "lat": -6.1614,
-    "lon": 106.7803,
-    "lines": ["tangerang"],
-    "sequences": { "tangerang": 2 }
+    "lat": -6.162035,
+    "lon": 106.78961,
+    "lines": [
+      "tangerang"
+    ],
+    "sequences": {
+      "tangerang": 2
+    }
   },
   {
     "id": "PSG",
     "name": "Pesing",
-    "lat": -6.1675,
-    "lon": 106.7569,
-    "lines": ["tangerang"],
-    "sequences": { "tangerang": 3 }
+    "lat": -6.161252,
+    "lon": 106.771908,
+    "lines": [
+      "tangerang"
+    ],
+    "sequences": {
+      "tangerang": 3
+    }
   },
   {
     "id": "TMK",
     "name": "Taman Kota",
-    "lat": -6.1656,
-    "lon": 106.7389,
-    "lines": ["tangerang"],
-    "sequences": { "tangerang": 4 }
+    "lat": -6.158627,
+    "lon": 106.756573,
+    "lines": [
+      "tangerang"
+    ],
+    "sequences": {
+      "tangerang": 4
+    }
   },
   {
     "id": "BJI",
     "name": "Bojong Indah",
-    "lat": -6.1650,
-    "lon": 106.7239,
-    "lines": ["tangerang"],
-    "sequences": { "tangerang": 5 }
+    "lat": -6.160214,
+    "lon": 106.736134,
+    "lines": [
+      "tangerang"
+    ],
+    "sequences": {
+      "tangerang": 5
+    }
   },
   {
     "id": "RWBY",
     "name": "Rawa Buaya",
-    "lat": -6.1647,
-    "lon": 106.7108,
-    "lines": ["tangerang"],
-    "sequences": { "tangerang": 6 }
+    "lat": -6.162744,
+    "lon": 106.722754,
+    "lines": [
+      "tangerang"
+    ],
+    "sequences": {
+      "tangerang": 6
+    }
   },
   {
     "id": "KDS",
     "name": "Kalideres",
-    "lat": -6.1569,
-    "lon": 106.6931,
-    "lines": ["tangerang"],
-    "sequences": { "tangerang": 7 }
+    "lat": -6.165966,
+    "lon": 106.703728,
+    "lines": [
+      "tangerang"
+    ],
+    "sequences": {
+      "tangerang": 7
+    }
   },
   {
     "id": "PRS",
     "name": "Poris",
-    "lat": -6.1625,
-    "lon": 106.6681,
-    "lines": ["tangerang"],
-    "sequences": { "tangerang": 8 }
+    "lat": -6.169735,
+    "lon": 106.680752,
+    "lines": [
+      "tangerang"
+    ],
+    "sequences": {
+      "tangerang": 8
+    }
   },
   {
     "id": "BTC",
     "name": "Batu Ceper",
-    "lat": -6.1653,
-    "lon": 106.6503,
-    "lines": ["tangerang"],
-    "sequences": { "tangerang": 9 }
+    "lat": -6.172027,
+    "lon": 106.665287,
+    "lines": [
+      "tangerang"
+    ],
+    "sequences": {
+      "tangerang": 9
+    }
   },
   {
     "id": "TTI",
     "name": "Tanah Tinggi",
-    "lat": -6.1708,
-    "lon": 106.6372,
-    "lines": ["tangerang"],
-    "sequences": { "tangerang": 10 }
+    "lat": -6.17517,
+    "lon": 106.64671,
+    "lines": [
+      "tangerang"
+    ],
+    "sequences": {
+      "tangerang": 10
+    }
   },
   {
     "id": "TNG",
     "name": "Tangerang",
-    "lat": -6.1764,
-    "lon": 106.6297,
-    "lines": ["tangerang"],
-    "sequences": { "tangerang": 11 }
+    "lat": -6.176975,
+    "lon": 106.632011,
+    "lines": [
+      "tangerang"
+    ],
+    "sequences": {
+      "tangerang": 11
+    }
   },
   {
     "id": "ANK",
     "name": "Ancol",
-    "lat": -6.1244,
-    "lon": 106.8414,
-    "lines": ["tanjungpriok"],
-    "sequences": { "tanjungpriok": 3 }
+    "lat": -6.128115,
+    "lon": 106.845137,
+    "lines": [
+      "tanjungpriok"
+    ],
+    "sequences": {
+      "tanjungpriok": 3
+    }
   },
   {
     "id": "TJP",
     "name": "Tanjung Priuk",
-    "lat": -6.1100,
-    "lon": 106.8767,
-    "lines": ["tanjungpriok"],
-    "sequences": { "tanjungpriok": 4 }
+    "lat": -6.110691,
+    "lon": 106.881498,
+    "lines": [
+      "tanjungpriok"
+    ],
+    "sequences": {
+      "tanjungpriok": 4
+    }
   }
 ]

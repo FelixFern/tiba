@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["TibaLiveNotificationModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.tibalivenotification.TibaLiveNotificationModule"]
+  }
+}

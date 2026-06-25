@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "scheme": "tiba",
     "ios": {
       "supportsTablet": true,
@@ -34,7 +34,10 @@
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_LOCATION"
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "package": "com.felixfern.tiba"
     },
@@ -51,7 +54,27 @@
           "isAndroidForegroundServiceEnabled": true
         }
       ],
-      "expo-audio"
-    ]
+      "expo-audio",
+      [
+        "expo-widgets",
+        {
+          "frequentUpdates": true,
+          "groupIdentifier": "group.com.felixfern.tiba",
+          "enablePushNotifications": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "cdff45b0-5a7a-49d0-b90f-1f2b0ad8b94c"
+      }
+    },
+    "owner": "felixfern",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cdff45b0-5a7a-49d0-b90f-1f2b0ad8b94c"
+    }
   }
 }

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { storage } from './storage';
-import { Station, Line, LineId } from './types';
+import { Station, Line, LineId, TripPlan } from './types';
 
 // ============================================================================
 // Type Definitions
@@ -26,15 +26,28 @@ export interface LocationState {
 }
 
 export interface TripState {
+  // Final destination the user selected (persisted). Kept as a full Station for
+  // the screens that only need the end point.
   destination: Station | null;
+  // Computed multi-leg route from the user's position to the destination. Held
+  // in memory and rebuilt lazily from the current location (so a cold start
+  // mid-trip re-plans from where you actually are).
+  tripPlan: TripPlan | null;
+  currentLegIndex: number;
   alarmThreshold: number;
   isAlarmActive: boolean;
+  // Distinguishes a transfer alarm (switch lines, trip continues) from the final
+  // arrival alarm (trip ends) so the alarm screen and dismiss behave correctly.
+  alarmKind: 'transfer' | 'arrival' | null;
   stationsRemaining: number | null;
 }
+
+export type ThemePref = 'light' | 'dark' | 'system';
 
 export interface SettingsState {
   isTracking: boolean;
   hasLocationPermission: boolean;
+  themePref: ThemePref;
 }
 
 // ============================================================================
@@ -44,8 +57,16 @@ export interface SettingsState {
 export interface TibaStore extends LocationState, TripState, SettingsState {
   // Trip actions (persisted to MMKV)
   setDestination: (station: Station | null) => void;
+  setTripPlan: (plan: TripPlan | null) => void;
+  advanceLeg: () => void;
   setAlarmThreshold: (threshold: number) => void;
   setIsAlarmActive: (active: boolean) => void;
+  setThemePref: (pref: ThemePref) => void;
+
+  // Reset the active journey (destination + transient location/trip state) while
+  // keeping user preferences like the alarm threshold. Used when an arrival
+  // alarm is dismissed — the trip is over, so return to a clean slate.
+  resetTrip: () => void;
 
   // Utility
   resetStore: () => void;
@@ -58,6 +79,7 @@ export interface TibaStore extends LocationState, TripState, SettingsState {
 const MMKV_KEYS = {
   DESTINATION: 'tiba_destination',
   ALARM_THRESHOLD: 'tiba_alarm_threshold',
+  THEME_PREF: 'tiba_theme_pref',
 };
 
 // Transient location/settings state mutated directly via useTibaStore.setState()
@@ -88,6 +110,11 @@ export const useTibaStore = create<TibaStore>((set) => {
       initialState.alarmThreshold = savedAlarmThreshold;
     }
 
+    const savedThemePref = storage.getString(MMKV_KEYS.THEME_PREF);
+    if (savedThemePref === 'light' || savedThemePref === 'dark' || savedThemePref === 'system') {
+      initialState.themePref = savedThemePref;
+    }
+
     return initialState;
   };
 
@@ -106,8 +133,11 @@ export const useTibaStore = create<TibaStore>((set) => {
     // Trip State (partial persistence)
     // ========================================================================
     destination: persistedState.destination || null,
+    tripPlan: null,
+    currentLegIndex: 0,
     alarmThreshold: persistedState.alarmThreshold ?? 3,
     isAlarmActive: false,
+    alarmKind: null,
     stationsRemaining: null,
 
     // ========================================================================
@@ -115,6 +145,7 @@ export const useTibaStore = create<TibaStore>((set) => {
     // ========================================================================
     isTracking: false,
     hasLocationPermission: false,
+    themePref: persistedState.themePref ?? 'system',
 
     // ========================================================================
     // Trip Actions (with MMKV Persistence)
@@ -133,6 +164,12 @@ export const useTibaStore = create<TibaStore>((set) => {
       }
     },
 
+    // tripPlan is intentionally NOT persisted — it's rebuilt from the live
+    // position so resuming mid-trip re-plans from where you actually are.
+    setTripPlan: (plan) => set({ tripPlan: plan, currentLegIndex: 0 }),
+
+    advanceLeg: () => set((s) => ({ currentLegIndex: s.currentLegIndex + 1 })),
+
     setAlarmThreshold: (threshold) => {
       set({ alarmThreshold: threshold });
 
@@ -144,6 +181,32 @@ export const useTibaStore = create<TibaStore>((set) => {
     },
 
     setIsAlarmActive: (active) => set({ isAlarmActive: active }),
+
+    setThemePref: (pref) => {
+      set({ themePref: pref });
+      try {
+        storage.set(MMKV_KEYS.THEME_PREF, pref);
+      } catch (e) {
+        console.warn('Failed to persist theme preference:', e);
+      }
+    },
+
+    resetTrip: () => {
+      storage.remove(MMKV_KEYS.DESTINATION);
+      set({
+        // Trip
+        destination: null,
+        tripPlan: null,
+        currentLegIndex: 0,
+        isAlarmActive: false,
+        alarmKind: null,
+        stationsRemaining: null,
+        // Transient location/direction state from the finished journey
+        nearestStation: null,
+        currentLine: null,
+        direction: null,
+      });
+    },
 
     // ========================================================================
     // Utility Actions
@@ -161,8 +224,11 @@ export const useTibaStore = create<TibaStore>((set) => {
 
         // Trip
         destination: null,
+        tripPlan: null,
+        currentLegIndex: 0,
         alarmThreshold: 3,
         isAlarmActive: false,
+        alarmKind: null,
         stationsRemaining: null,
 
         // Settings

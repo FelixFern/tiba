@@ -1,28 +1,46 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
-import { useAnimatedCounter, usePulse, useSpringPress, useSlideTransition } from '../../lib/animations';
-import { colors, fonts, spacing, fontSize, borderColors, badgeColors } from '../../lib/theme';
+import { useAnimatedCounter, usePulse, useSpringPress } from '../../lib/animations';
+import { fonts, spacing, fontSize, badgeColors, type Theme } from '../../lib/theme';
+import { useTheme } from '../../lib/use-theme';
 import { useTibaStore } from '../../lib/store';
+import { refreshCurrentLocationOnce } from '../../lib/location';
 import {
-  requestLocationPermissions,
-  startForegroundTracking,
-  stopForegroundTracking,
-  refreshCurrentLocationOnce,
-} from '../../lib/location';
-import { calculateStationsRemaining } from '../../lib/alarm';
-import { getStationsByLine } from '../../lib/data';
+  startBackgroundTracking,
+  stopBackgroundTracking,
+} from '../../lib/background-location';
+import { planRoute } from '../../lib/transit';
+import { getStationById, getLineById } from '../../lib/data';
+import type { Station, LineId } from '../../lib/types';
 import PageHeader from '../../components/PageHeader';
+
+type RouteStatus = 'passed' | 'current' | 'upcoming' | 'destination' | 'transfer';
+
+interface RouteRow {
+  station: Station;
+  status: RouteStatus;
+  passed: boolean;
+  dotColor: string;
+  topColor: string;
+  bottomColor: string;
+  transferToLine?: string;
+}
 
 export default function HomeScreen() {
   const nearestStation = useTibaStore((s) => s.nearestStation);
-  const currentLine = useTibaStore((s) => s.currentLine);
-  const direction = useTibaStore((s) => s.direction);
   const destination = useTibaStore((s) => s.destination);
+  const tripPlan = useTibaStore((s) => s.tripPlan);
+  const currentLegIndex = useTibaStore((s) => s.currentLegIndex);
   const stationsRemaining = useTibaStore((s) => s.stationsRemaining);
   const isTracking = useTibaStore((s) => s.isTracking);
   const alarmThreshold = useTibaStore((s) => s.alarmThreshold);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   // Populate current position/line on load without a full tracking session.
   useEffect(() => {
@@ -34,206 +52,322 @@ export default function HomeScreen() {
   }, []);
 
   const handleStartTracking = async () => {
-    await requestLocationPermissions();
-    await startForegroundTracking();
+    await startBackgroundTracking();
   };
 
-  const handleStopTracking = () => {
-    stopForegroundTracking();
+  const handleStopTracking = async () => {
+    await stopBackgroundTracking();
   };
 
-  // Foreground fallback computation for stationsRemaining
-  const computedStationsRemaining = useMemo(() => {
+  // The active plan: the stored route while tracking, or a live preview computed
+  // from the current position + destination before the trip starts.
+  const plan = useMemo(() => {
+    if (tripPlan) return tripPlan;
+    if (nearestStation && destination) return planRoute(nearestStation.id, destination.id);
+    return null;
+  }, [tripPlan, nearestStation, destination]);
+
+  const activeLeg = plan?.legs[currentLegIndex] ?? null;
+  const legLine = activeLeg ? getLineById(activeLeg.lineId) : null;
+  const legTarget = activeLeg ? getStationById(activeLeg.toStationId) ?? destination : destination;
+  const isTransferTarget = activeLeg?.isTransfer ?? false;
+  const nextLegLineId = plan && activeLeg ? plan.legs[currentLegIndex + 1]?.lineId : undefined;
+  const nextLineName = nextLegLineId ? getLineById(nextLegLineId)?.name : undefined;
+
+  const lineColor = legLine?.color ?? theme.accent;
+  const lineLabel = legLine?.name?.toUpperCase() ?? '';
+
+  // Stops to the current leg's alight — the store value while tracking, else
+  // derived from the leg's ordered segment (index-based, never negative).
+  const remaining = useMemo(() => {
     if (stationsRemaining !== null) return stationsRemaining;
-    if (!nearestStation || !destination || !currentLine || !direction) return null;
-    return calculateStationsRemaining(nearestStation, destination, currentLine, direction);
-  }, [stationsRemaining, nearestStation, destination, currentLine, direction]);
+    if (!activeLeg || !nearestStation) return null;
+    const i = activeLeg.stationIds.indexOf(nearestStation.id);
+    return i === -1 ? null : activeLeg.stationIds.length - 1 - i;
+  }, [stationsRemaining, activeLeg, nearestStation]);
+  const displayRemaining = remaining;
 
-  // Route computation for timeline
-  const routeStations = useMemo(() => {
-    if (!currentLine || !direction || !nearestStation || !destination) return [];
-    const lineStations = getStationsByLine(currentLine.id);
-    const currentIdx = lineStations.findIndex((s) => s.id === nearestStation.id);
-    const destIdx = lineStations.findIndex((s) => s.id === destination.id);
-    if (currentIdx === -1 || destIdx === -1) return [];
-    const start = Math.min(currentIdx, destIdx);
-    const end = Math.max(currentIdx, destIdx);
-    const slice = lineStations.slice(start, end + 1);
-    return direction === 'decreasing' ? slice.reverse() : slice;
-  }, [currentLine, direction, nearestStation, destination]);
+  // Full multi-leg route: every station origin → destination, transfers marked.
+  const routeRows = useMemo<RouteRow[]>(() => {
+    if (!plan || !nearestStation) return [];
+    type Flat = { sid: string; legIndex: number; lineId: LineId; isTransferPoint: boolean };
+    const flat: Flat[] = [];
+    plan.legs.forEach((leg, li) => {
+      leg.stationIds.forEach((sid, i) => {
+        if (li > 0 && i === 0) return; // dedupe the shared interchange station
+        flat.push({
+          sid,
+          legIndex: li,
+          lineId: leg.lineId,
+          isTransferPoint: leg.isTransfer && i === leg.stationIds.length - 1,
+        });
+      });
+    });
+    const curPos = flat.findIndex((f) => f.sid === nearestStation.id);
+    const lastIdx = flat.length - 1;
+    const rows: RouteRow[] = [];
+    flat.forEach((f, idx) => {
+      const station = getStationById(f.sid);
+      if (!station) return;
+      const legColor = getLineById(f.lineId)?.color ?? theme.accent;
+      const nextLeg = plan.legs[f.legIndex + 1];
+      const nextColor = nextLeg ? getLineById(nextLeg.lineId)?.color ?? legColor : legColor;
+      const passed = curPos !== -1 && idx < curPos;
+      let status: RouteStatus;
+      if (f.sid === nearestStation.id) status = 'current';
+      else if (idx === lastIdx) status = 'destination';
+      else if (f.isTransferPoint) status = 'transfer';
+      else status = passed ? 'passed' : 'upcoming';
+      rows.push({
+        station,
+        status,
+        passed,
+        dotColor: legColor,
+        topColor: legColor,
+        bottomColor: f.isTransferPoint ? nextColor : legColor,
+        transferToLine: f.isTransferPoint && nextLeg ? getLineById(nextLeg.lineId)?.name : undefined,
+      });
+    });
+    return rows;
+  }, [plan, nearestStation]);
 
-  // Determine alarm status message
-  const alarmStatusMessage = useMemo(() => {
-    if (computedStationsRemaining === null) return null;
-    if (computedStationsRemaining === 0) {
-      return { text: '● Arrived', color: badgeColors.tracking };
+  // Keep the current station in view as the trip progresses.
+  const currentRowIndex = routeRows.findIndex((r) => r.status === 'current');
+  useEffect(() => {
+    if (currentRowIndex > 0 && scrollRef.current) {
+      scrollRef.current.scrollTo({
+        y: Math.max(0, (currentRowIndex - 1) * ROW_HEIGHT),
+        animated: true,
+      });
     }
-    if (computedStationsRemaining <= alarmThreshold) {
-      return { text: `● ${computedStationsRemaining} stops out · prepare to alight`, color: '#FFA500' };
+  }, [currentRowIndex]);
+
+  // Alarm status row text (adapts for transfer vs final-arrival legs).
+  const { statusSquareColor, statusLeftText, statusRightText } = useMemo(() => {
+    if (remaining === 0) {
+      return isTransferTarget
+        ? {
+            statusSquareColor: theme.warning,
+            statusLeftText: 'Transfer now',
+            statusRightText: nextLineName ? `change to ${nextLineName}` : 'change lines',
+          }
+        : {
+            statusSquareColor: badgeColors.tracking,
+            statusLeftText: 'Arrived',
+            statusRightText: "you're here",
+          };
     }
-    return { text: '● Alarm armed', color: badgeColors.tracking };
-  }, [computedStationsRemaining, alarmThreshold]);
+    if (remaining !== null && remaining > 0 && remaining <= alarmThreshold) {
+      return {
+        statusSquareColor: theme.accent,
+        statusLeftText: isTransferTarget ? 'Transfer soon' : 'Alarm armed',
+        statusRightText: `${remaining} stop${remaining === 1 ? '' : 's'} · ${
+          isTransferTarget ? 'prepare to change' : 'prepare to alight'
+        }`,
+      };
+    }
+    if (remaining !== null && remaining > 0) {
+      return {
+        statusSquareColor: theme.accent,
+        statusLeftText: 'Alarm armed',
+        statusRightText: `${remaining} stations to ${isTransferTarget ? 'transfer' : 'destination'}`,
+      };
+    }
+    return {
+      statusSquareColor: theme.accent,
+      statusLeftText: isTracking ? 'Detecting…' : 'Alarm armed',
+      statusRightText: '',
+    };
+  }, [remaining, alarmThreshold, isTracking, isTransferTarget, nextLineName, theme]);
 
-  // Human-readable travel direction indicator.
-  const directionLabel = useMemo(() => {
-    if (direction === 'increasing') return 'HEADING ↑';
-    if (direction === 'decreasing') return 'HEADING ↓';
-    return isTracking ? 'DETECTING DIRECTION…' : null;
-  }, [direction, isTracking]);
-
-  const { animatedStyle: counterAnimStyle } = useAnimatedCounter(computedStationsRemaining);
+  const { animatedStyle: counterAnimStyle } = useAnimatedCounter(displayRemaining);
   const pulseStyle = usePulse(true);
-  const livePulseStyle = usePulse(!!nearestStation);
-  const { animatedStyle: startPressStyle, onPressIn: startPressIn, onPressOut: startPressOut } = useSpringPress(0.95);
-  const { animatedStyle: stopPressStyle, onPressIn: stopPressIn, onPressOut: stopPressOut } = useSpringPress(0.95);
-  const badgeSlideStyle = useSlideTransition(isTracking, { from: 'top', distance: 12 });
+  const livePulseStyle = usePulse(isTracking);
+  const { animatedStyle: startPressStyle, onPressIn: startPressIn, onPressOut: startPressOut } =
+    useSpringPress(0.95);
+  const { animatedStyle: stopPressStyle, onPressIn: stopPressIn, onPressOut: stopPressOut } =
+    useSpringPress(0.95);
 
   const trackingBadge = (
-    <Animated.View
-      style={[styles.trackingBadge, badgeSlideStyle]}
-      pointerEvents={isTracking ? 'auto' : 'none'}
-    >
-      <View style={styles.trackingDot} />
-      <Text style={styles.trackingText}>TRACKING</Text>
-    </Animated.View>
+    <View style={styles.trackingBadge}>
+      <Animated.View style={isTracking ? livePulseStyle : undefined}>
+        <View
+          style={[
+            styles.trackingDot,
+            { backgroundColor: isTracking ? badgeColors.tracking : theme.dim },
+          ]}
+        />
+      </Animated.View>
+      <Text style={[styles.trackingText, { color: isTracking ? theme.textMuted : theme.dim }]}>
+        {isTracking ? 'TRACKING' : 'IDLE'}
+      </Text>
+    </View>
   );
 
   return (
     <View style={styles.container}>
       <PageHeader title="tiba" right={trackingBadge} />
 
-      {/* Current position + line — always visible */}
-      <View style={styles.positionCard}>
-        <Text style={styles.positionLabel}>CURRENT POSITION</Text>
-        {nearestStation ? (
-          <>
-            <Text style={styles.stationNameLarge}>{nearestStation.name.toUpperCase()}</Text>
-            <View style={styles.metaRow}>
-              {currentLine && (
-                <View style={styles.lineBadge}>
-                  <Animated.View style={livePulseStyle}>
-                    <View style={[styles.lineDot, { backgroundColor: currentLine.color }]} />
-                  </Animated.View>
-                  <Text style={styles.lineText}>{currentLine.name.toUpperCase()}</Text>
-                </View>
-              )}
-              {directionLabel && <Text style={styles.directionText}>{directionLabel}</Text>}
-            </View>
-          </>
-        ) : (
-          <Text style={styles.noStation}>
-            {isTracking ? 'Locating…' : 'Enable location to detect your station'}
-          </Text>
-        )}
-      </View>
-
-      {/* Trip details when a destination is armed */}
       {destination ? (
         <>
-          {/* Stations Counter Section */}
-          <View style={styles.counterSection}>
-            <View style={styles.counterLeft}>
-              <Text style={styles.counterLabel}>STATIONS TO GO</Text>
-              {currentLine && (
-                <View style={styles.lineInfo}>
-                  <View style={[styles.lineIndicatorDot, { backgroundColor: currentLine.color }]} />
-                  <Text style={styles.lineInfoText}>{currentLine.name.toUpperCase()}</Text>
-                </View>
-              )}
+          {/* Hero countdown card */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroTopRow}>
+              <Text style={styles.heroLabel}>STATIONS TO GO</Text>
+              {!!lineLabel && <Text style={styles.heroLineLabel}>{lineLabel}</Text>}
             </View>
-            <View style={styles.counterRight}>
+
+            <View style={styles.heroNumberRow}>
               <Animated.View style={counterAnimStyle}>
-                <Text style={styles.counterNumber}>
-                  {computedStationsRemaining !== null ? computedStationsRemaining : '—'}
+                <Text style={styles.heroNumber}>
+                  {displayRemaining !== null ? displayRemaining : '—'}
                 </Text>
               </Animated.View>
-              <Text style={styles.destinationName}>{destination.name.toUpperCase()}</Text>
-              <Text style={styles.destinationSubtitle}>final destination</Text>
+              <View style={styles.heroDestBlock}>
+                <View style={styles.heroDestNameRow}>
+                  <View style={[styles.heroDestDot, { backgroundColor: lineColor }]} />
+                  <Text style={styles.heroDestName} numberOfLines={1} adjustsFontSizeToFit>
+                    {legTarget?.name ?? destination.name}
+                  </Text>
+                </View>
+                <Text style={styles.heroDestSub}>
+                  {isTransferTarget
+                    ? nextLineName
+                      ? `transfer · ${nextLineName}`
+                      : 'transfer'
+                    : 'final destination'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.heroDivider} />
+
+            <View style={styles.heroStatusRow}>
+              <View style={styles.heroStatusLeft}>
+                <View style={[styles.heroStatusSquare, { backgroundColor: statusSquareColor }]} />
+                <Text style={styles.heroStatusText}>{statusLeftText}</Text>
+              </View>
+              {!!statusRightText && <Text style={styles.heroStatusRight}>{statusRightText}</Text>}
             </View>
           </View>
 
-          {/* Alarm Status Row */}
-          {alarmStatusMessage && (
-            <View style={styles.alarmStatusRow}>
-              <Text style={[styles.alarmStatusText, { color: alarmStatusMessage.color }]}>
-                {alarmStatusMessage.text}
-              </Text>
-            </View>
-          )}
-
-          {/* Route Timeline Section */}
-          {currentLine && direction && routeStations.length > 0 ? (
-            <View style={styles.routeSection}>
-              <Text style={styles.routeLabel}>YOUR ROUTE</Text>
-              <ScrollView style={styles.routeTimeline} showsVerticalScrollIndicator={false}>
-                {routeStations.map((station, idx) => {
+          {/* YOUR ROUTE — main section */}
+          <View style={styles.routeSection}>
+            <Text style={styles.routeLabel}>YOUR ROUTE</Text>
+            {routeRows.length > 0 ? (
+              <ScrollView
+                ref={scrollRef}
+                style={styles.routeTimeline}
+                showsVerticalScrollIndicator={false}
+              >
+                {routeRows.map((row, idx) => {
                   const isFirst = idx === 0;
-                  const isLast = idx === routeStations.length - 1;
+                  const isLast = idx === routeRows.length - 1;
+                  const { station, status } = row;
                   return (
-                    <View key={station.id} style={[styles.routeStationRow, !isFirst && !isLast && { opacity: 0.65 }]}>
-                      <View style={styles.timelineColumn}>
-                        {isFirst ? (
-                          <Animated.View style={pulseStyle}>
-                            <View style={[styles.routeDotCurrent, { borderColor: '#3B82F6' }]} />
-                          </Animated.View>
-                        ) : isLast ? (
-                          <View style={[styles.routeDotDestination, { borderColor: currentLine.color }]} />
-                        ) : (
-                          <View style={[styles.routeDot, { backgroundColor: currentLine.color }]} />
+                    <View
+                      key={`${station.id}-${idx}`}
+                      style={[styles.routeRow, row.passed && styles.routeRowPassed]}
+                    >
+                      <View style={styles.rail}>
+                        {!isFirst && (
+                          <View style={[styles.railLineTop, { backgroundColor: row.topColor }]} />
                         )}
                         {!isLast && (
-                          <View style={[styles.routeLine, { backgroundColor: currentLine.color }]} />
+                          <View
+                            style={[styles.railLineBottom, { backgroundColor: row.bottomColor }]}
+                          />
                         )}
+                        <View style={styles.railDotWrap}>
+                          {status === 'current' ? (
+                            <View style={styles.dotCurrentGlow}>
+                              <Animated.View style={[styles.dotCurrent, pulseStyle]} />
+                            </View>
+                          ) : status === 'destination' ? (
+                            <View style={[styles.dotDestination, { borderColor: row.dotColor }]} />
+                          ) : status === 'transfer' ? (
+                            <View style={[styles.dotTransfer, { borderColor: row.dotColor }]} />
+                          ) : status === 'upcoming' ? (
+                            <View style={styles.dotUpcoming} />
+                          ) : (
+                            <View style={styles.dotPassed} />
+                          )}
+                        </View>
                       </View>
-                      <View style={styles.routeStationInfo}>
-                        <Text style={styles.routeStationName}>{station.name}</Text>
-                        {isFirst && <Text style={styles.routeLabelCurrent}>YOU ARE HERE</Text>}
-                        {isLast && <Text style={styles.routeLabelDestination}>DESTINATION</Text>}
+                      <View style={styles.routeContent}>
+                        <Text
+                          style={[
+                            styles.routeName,
+                            status === 'passed' && styles.routeNamePassed,
+                            status === 'upcoming' && styles.routeNameUpcoming,
+                            status === 'current' && styles.routeNameCurrent,
+                            (status === 'destination' || status === 'transfer') &&
+                              styles.routeNameDestination,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {station.name}
+                        </Text>
+                        {status === 'current' && <Text style={styles.youAreHere}>YOU ARE HERE</Text>}
+                        {status === 'transfer' && (
+                          <View style={[styles.destBadge, { borderColor: row.dotColor }]}>
+                            <Text style={[styles.destBadgeText, { color: row.dotColor }]}>
+                              {row.transferToLine
+                                ? `TRANSFER · ${row.transferToLine.toUpperCase()}`
+                                : 'TRANSFER'}
+                            </Text>
+                          </View>
+                        )}
+                        {status === 'destination' && (
+                          <View style={[styles.destBadge, { borderColor: row.dotColor }]}>
+                            <Text style={[styles.destBadgeText, { color: row.dotColor }]}>
+                              DESTINATION
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                   );
                 })}
               </ScrollView>
-            </View>
-          ) : (
-            <View style={styles.routeSection}>
+            ) : (
               <Text style={styles.directionPending}>
-                {isTracking ? 'Detecting direction…' : 'Start tracking to map your route'}
+                {isTracking ? 'Mapping your route…' : 'Start tracking to map your route'}
               </Text>
-            </View>
-          )}
+            )}
+          </View>
         </>
       ) : (
-        /* No destination armed yet */
         <View style={styles.noDestinationContainer}>
           <Text style={styles.noDestinationTitle}>No destination armed</Text>
           <Pressable onPress={() => router.push('/(tabs)/alarm')} style={styles.setDestinationButton}>
-            <Text style={styles.setDestinationText}>SET DESTINATION →</Text>
+            <Text style={styles.setDestinationText}>SET DESTINATION</Text>
+            <Ionicons name="arrow-forward" size={15} color={theme.accent} />
           </Pressable>
         </View>
       )}
 
-      {/* Bottom Button */}
+      {/* Bottom tracking button */}
       {isTracking ? (
-        <Animated.View style={stopPressStyle}>
+        <Animated.View style={[styles.buttonWrap, stopPressStyle]}>
           <Pressable
             onPress={handleStopTracking}
             onPressIn={stopPressIn}
             onPressOut={stopPressOut}
             style={styles.buttonStop}
           >
-            <Text style={styles.buttonText}>STOP TRACKING</Text>
+            <Text style={styles.buttonStopText}>STOP TRACKING</Text>
           </Pressable>
         </Animated.View>
       ) : (
-        <Animated.View style={startPressStyle}>
+        <Animated.View style={[styles.buttonWrap, startPressStyle]}>
           <Pressable
             onPress={handleStartTracking}
             onPressIn={startPressIn}
             onPressOut={startPressOut}
             style={styles.buttonStart}
           >
-            <Text style={styles.buttonText}>START TRACKING</Text>
+            <Text style={styles.buttonStartText}>START TRACKING</Text>
           </Pressable>
         </Animated.View>
       )}
@@ -241,223 +375,291 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Rail is wide enough to fully contain the current-station glow ring (22px) so
+// the pulsing dot is never clipped by the column edges.
+const RAIL_WIDTH = 22;
+const RAIL_LINE_LEFT = RAIL_WIDTH / 2 - 1;
+const ROW_HEIGHT = 46;
+
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.monoBg,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xl,
+    backgroundColor: t.bg,
   },
+
+  // Tracking pill (header right slot)
   trackingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 7,
+    borderWidth: 1,
+    borderColor: t.border,
+    borderRadius: 2,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
   },
   trackingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: badgeColors.tracking,
-    marginRight: spacing.sm,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   trackingText: {
     fontFamily: fonts.bold,
-    fontSize: fontSize.md,
-    color: badgeColors.tracking,
-    letterSpacing: 1,
+    fontSize: fontSize.sm,
+    letterSpacing: 1.4,
   },
-  positionCard: {
-    paddingBottom: spacing.xl,
-    borderBottomWidth: 1,
-    borderBottomColor: borderColors.subtle,
+
+  // Hero countdown card
+  heroCard: {
+    marginHorizontal: spacing.xl,
+    borderWidth: 1,
+    borderColor: t.border,
+    borderRadius: 3,
+    padding: 20,
   },
-  positionLabel: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.md,
-    color: '#999999',
-    letterSpacing: 1.5,
-    marginBottom: spacing.sm,
-  },
-  stationNameLarge: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.display,
-    color: colors.monoFg,
-    marginBottom: spacing.md,
-  },
-  metaRow: {
+  heroTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'baseline',
   },
-  noStation: {
-    fontFamily: fonts.regular,
-    fontSize: fontSize.lg,
-    color: colors.monoGray2,
-    marginTop: spacing.sm,
-  },
-  lineBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  lineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: spacing.sm,
-  },
-  lineText: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.md,
-    color: colors.monoFg,
-    letterSpacing: 1,
-  },
-  directionText: {
+  heroLabel: {
     fontFamily: fonts.bold,
     fontSize: fontSize.sm,
-    color: colors.monoAccent,
-    letterSpacing: 1,
+    color: t.textMuted,
+    letterSpacing: 1.8,
   },
-  counterSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xl,
-    borderBottomWidth: 1,
-    borderBottomColor: borderColors.subtle,
-  },
-  counterLeft: {
-    justifyContent: 'space-between',
-  },
-  counterLabel: {
+  heroLineLabel: {
     fontFamily: fonts.bold,
-    fontSize: fontSize.md,
-    color: '#999999',
-    letterSpacing: 1.5,
-    marginBottom: spacing.sm,
+    fontSize: fontSize.sm,
+    color: t.textMuted,
+    letterSpacing: 1.6,
   },
-  lineInfo: {
+  heroNumberRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-  lineIndicatorDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: spacing.sm,
-  },
-  lineInfoText: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.md,
-    color: colors.monoFg,
-    letterSpacing: 1,
-  },
-  counterRight: {
     alignItems: 'flex-end',
-  },
-  counterNumber: {
-    fontFamily: fonts.bold,
-    fontSize: 64,
-    color: colors.monoFg,
-    lineHeight: 64,
-  },
-  destinationName: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.xl,
-    color: colors.monoFg,
-    marginTop: spacing.sm,
-  },
-  destinationSubtitle: {
-    fontFamily: fonts.regular,
-    fontSize: fontSize.md,
-    color: '#999999',
+    gap: spacing.lg,
     marginTop: spacing.xs,
   },
-  alarmStatusRow: {
-    paddingVertical: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: borderColors.subtle,
-  },
-  alarmStatusText: {
+  heroNumber: {
     fontFamily: fonts.bold,
-    fontSize: fontSize.body,
-    letterSpacing: 0.5,
+    fontSize: 80,
+    lineHeight: 74,
+    color: t.fg,
+    letterSpacing: -3,
   },
+  heroDestBlock: {
+    flex: 1,
+    paddingBottom: spacing.md,
+  },
+  heroDestNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  heroDestDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  heroDestName: {
+    flex: 1,
+    fontFamily: fonts.bold,
+    fontSize: 24,
+    color: t.fg,
+    letterSpacing: -0.5,
+  },
+  heroDestSub: {
+    fontFamily: fonts.regular,
+    fontSize: fontSize.md,
+    color: t.textMuted,
+    marginTop: spacing.xs,
+  },
+  heroDivider: {
+    height: 1,
+    backgroundColor: t.border,
+    marginVertical: spacing.lg,
+  },
+  heroStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  heroStatusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  heroStatusSquare: {
+    width: 8,
+    height: 8,
+    borderRadius: 1,
+  },
+  heroStatusText: {
+    fontFamily: fonts.regular,
+    fontSize: fontSize.md,
+    color: t.fg,
+  },
+  heroStatusRight: {
+    flexShrink: 1,
+    textAlign: 'right',
+    fontFamily: fonts.regular,
+    fontSize: fontSize.sm + 1,
+    color: t.textMuted,
+  },
+
+  // Route section (main)
   routeSection: {
     flex: 1,
-    paddingTop: spacing.xl,
+    marginTop: 20,
+    paddingHorizontal: spacing.xl,
   },
   routeLabel: {
     fontFamily: fonts.bold,
-    fontSize: fontSize.md,
-    color: '#999999',
-    letterSpacing: 1.5,
-    marginBottom: spacing.lg,
+    fontSize: fontSize.sm,
+    color: t.textMuted,
+    letterSpacing: 1.8,
+    marginBottom: spacing.sm,
   },
   routeTimeline: {
     flex: 1,
   },
-  routeStationRow: {
+  routeRow: {
     flexDirection: 'row',
-    marginBottom: spacing.md,
+    height: ROW_HEIGHT,
+    alignItems: 'stretch',
   },
-  timelineColumn: {
-    alignItems: 'center',
-    marginRight: spacing.lg,
-    width: 10,
+  routeRowPassed: {
+    opacity: 0.5,
   },
-  routeDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  rail: {
+    width: RAIL_WIDTH,
+    position: 'relative',
   },
-  routeDotCurrent: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#3B82F6',
-    borderWidth: 2,
-  },
-  routeDotDestination: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-  },
-  routeLine: {
+  railLineTop: {
+    position: 'absolute',
+    left: RAIL_LINE_LEFT,
+    top: 0,
+    height: '50%',
     width: 2,
-    flex: 1,
-    marginVertical: 2,
-    opacity: 0.3,
+    backgroundColor: t.border,
   },
-  routeStationInfo: {
-    flex: 1,
+  railLineBottom: {
+    position: 'absolute',
+    left: RAIL_LINE_LEFT,
+    top: '50%',
+    bottom: 0,
+    width: 2,
+    backgroundColor: t.border,
+  },
+  railDotWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  routeStationName: {
+  dotPassed: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: t.dim,
+  },
+  dotUpcoming: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: t.bg,
+    borderWidth: 2,
+    borderColor: t.dim,
+  },
+  dotDestination: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: t.bg,
+    borderWidth: 2,
+  },
+  dotTransfer: {
+    width: 12,
+    height: 12,
+    borderRadius: 3,
+    backgroundColor: t.bg,
+    borderWidth: 2,
+  },
+  dotCurrentGlow: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(59,130,246,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dotCurrent: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: t.accent,
+  },
+  routeContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: 14,
+  },
+  routeName: {
+    flexShrink: 1,
     fontFamily: fonts.regular,
-    fontSize: fontSize.body,
-    color: colors.monoFg,
+    fontSize: 15,
+    color: t.fg,
   },
-  routeLabelCurrent: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.sm,
-    color: '#3B82F6',
-    marginTop: spacing.xs,
-    letterSpacing: 0.5,
+  routeNamePassed: {
+    fontSize: 14,
+    color: t.textDim,
   },
-  routeLabelDestination: {
+  routeNameUpcoming: {
+    fontSize: 15,
+    color: t.textFaint,
+  },
+  routeNameCurrent: {
     fontFamily: fonts.bold,
-    fontSize: fontSize.sm,
-    color: colors.monoDanger,
-    marginTop: spacing.xs,
-    letterSpacing: 0.5,
+    fontSize: 17,
+    color: t.fg,
+  },
+  routeNameDestination: {
+    fontFamily: fonts.bold,
+    fontSize: 16,
+    color: t.fg,
+  },
+  youAreHere: {
+    fontFamily: fonts.bold,
+    fontSize: fontSize.xs + 1,
+    color: t.accent,
+    letterSpacing: 1.1,
+  },
+  destBadge: {
+    borderWidth: 1,
+    borderRadius: 2,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+  },
+  destBadgeText: {
+    fontFamily: fonts.bold,
+    fontSize: fontSize.xs + 1,
+    letterSpacing: 1,
   },
   directionPending: {
     fontFamily: fonts.regular,
     fontSize: fontSize.body,
-    color: colors.monoGray2,
+    color: t.dim,
     textAlign: 'center',
     paddingVertical: spacing.xl,
   },
+
+  // No destination
   noDestinationContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -467,38 +669,57 @@ const styles = StyleSheet.create({
   noDestinationTitle: {
     fontFamily: fonts.regular,
     fontSize: fontSize.lg,
-    color: colors.monoGray2,
+    color: t.dim,
   },
   setDestinationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     borderWidth: 1,
-    borderColor: borderColors.subtle,
+    borderColor: t.border,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
+    borderRadius: 3,
   },
   setDestinationText: {
     fontFamily: fonts.bold,
     fontSize: fontSize.md,
-    color: colors.monoAccent,
+    color: t.accent,
     letterSpacing: 1.5,
   },
+
+  // Bottom button
+  buttonWrap: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+  },
   buttonStart: {
-    backgroundColor: colors.monoAccent,
+    backgroundColor: t.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
+    height: 54,
+    borderRadius: 3,
+  },
+  buttonStartText: {
+    fontFamily: fonts.bold,
+    fontSize: fontSize.body,
+    color: '#0A0A0A',
+    letterSpacing: 1.8,
   },
   buttonStop: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: borderColors.subtle,
+    borderColor: t.dim,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 48,
+    height: 54,
+    borderRadius: 3,
   },
-  buttonText: {
+  buttonStopText: {
     fontFamily: fonts.bold,
-    fontSize: fontSize.lg,
-    color: colors.monoFg,
-    letterSpacing: 2,
+    fontSize: fontSize.body,
+    color: t.fg,
+    letterSpacing: 1.8,
   },
 });

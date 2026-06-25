@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -7,14 +7,17 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { colors, fonts } from '../lib/theme';
+import { fonts, type Theme } from '../lib/theme';
+import { useTheme } from '../lib/use-theme';
 
-const ACTIVE = colors.monoAccent;
-const INACTIVE = '#5C5C5C';
 const INDICATOR_WIDTH = 28;
 
 export default function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const ACTIVE = theme.accent;
+  const INACTIVE = theme.dim;
   const [barWidth, setBarWidth] = useState(0);
   const tabWidth = barWidth > 0 ? barWidth / state.routes.length : 0;
 
@@ -83,30 +86,31 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
   );
 }
 
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    backgroundColor: colors.monoBg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    paddingTop: 12,
-  },
-  indicator: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    height: 2,
-    backgroundColor: ACTIVE,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  label: {
-    fontSize: 9,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    bar: {
+      flexDirection: 'row',
+      backgroundColor: t.bg,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: t.divider,
+      paddingTop: 12,
+    },
+    indicator: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      height: 2,
+      backgroundColor: t.accent,
+    },
+    tab: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    label: {
+      fontSize: 9,
+      letterSpacing: 1.5,
+      textTransform: 'uppercase',
+    },
+  });

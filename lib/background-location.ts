@@ -1,16 +1,24 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import * as Notifications from 'expo-notifications';
-import { router } from 'expo-router';
 import {
   updateNearestStation,
   updateDirectionDetection,
+  evaluateTrip,
   startForegroundTracking,
   stopForegroundTracking,
   resetDetectionState,
 } from './location';
 import { useTibaStore, Position, Station, LineId } from './store';
-import { checkAlarmTrigger } from './alarm';
+import { getStationById, getLineById } from './data';
+import { getTripView } from './trip-view';
+import {
+  startLiveCard,
+  updateLiveCard,
+  endLiveCard,
+  isLiveCardActive,
+  type LiveCardState,
+} from './live-card';
 import { isExpoGo } from './env';
 import {
   LIVE_NOTIFICATION_ID,
@@ -41,43 +49,6 @@ const NOTIFICATION_COLOR = '#3B82F6';
 // ============================================================================
 
 let lastNotifiedStationId: string | null = null;
-let lastAlarmStationId: string | null = null;
-
-// ============================================================================
-// Calculate Stations Remaining
-// ============================================================================
-
-/**
- * Calculate how many stations remain between current and destination
- * @param currentStation - Current detected station
- * @param destination - Destination station
- * @param direction - Travel direction ('increasing' | 'decreasing')
- * @param lineId - Current line ID
- * @returns Number of stations remaining or null if cannot calculate
- */
-function calculateStationsRemaining(
-  currentStation: Station,
-  destination: Station,
-  direction: 'increasing' | 'decreasing' | null,
-  lineId: LineId | null
-): number | null {
-  if (!direction || !lineId) {
-    return null;
-  }
-
-  const currentSeq = currentStation.sequences[lineId];
-  const destSeq = destination.sequences[lineId];
-
-  if (currentSeq === undefined || destSeq === undefined) {
-    return null;
-  }
-
-  if (direction === 'increasing') {
-    return destSeq > currentSeq ? destSeq - currentSeq : null;
-  } else {
-    return currentSeq > destSeq ? currentSeq - destSeq : null;
-  }
-}
 
 // ============================================================================
 // Update Live Notification
@@ -103,13 +74,23 @@ export async function updateLiveNotification(
     let subtitle: string | undefined;
 
     if (station && destination) {
-      // Matches design screen 04: "Citayam → Bogor" / "3 stations left · alarm armed".
-      title = `${station.name} → ${destination.name}`;
+      // Show the current leg's target (transfer or final destination) plus leg
+      // progress for multi-leg trips, e.g. "Citayam → Tanah Abang (1/2)".
+      const { tripPlan, currentLegIndex } = useTibaStore.getState();
+      const leg = tripPlan?.legs[currentLegIndex];
+      const target = leg ? (getStationById(leg.toStationId) ?? destination) : destination;
+      const legSuffix =
+        tripPlan && tripPlan.legs.length > 1 ? ` (${currentLegIndex + 1}/${tripPlan.legs.length})` : '';
+      const transferring = leg?.isTransfer ?? false;
+
+      title = `${station.name} → ${target.name}${legSuffix}`;
       if (stationsRemaining !== null) {
-        body =
-          stationsRemaining === 0
-            ? 'Arriving now · prepare to alight'
-            : `${stationsRemaining} ${stationsRemaining === 1 ? 'station' : 'stations'} left · alarm armed`;
+        if (stationsRemaining === 0) {
+          body = transferring ? 'Transfer now · change lines' : 'Arriving now · prepare to alight';
+        } else {
+          const stops = `${stationsRemaining} ${stationsRemaining === 1 ? 'station' : 'stations'} left`;
+          body = transferring ? `${stops} · transfer ahead` : `${stops} · alarm armed`;
+        }
       } else {
         body = 'Alarm armed · detecting distance';
       }
@@ -143,6 +124,42 @@ export async function updateLiveNotification(
 }
 
 /**
+ * Build the live-card snapshot from current trip state, or null if there's no
+ * active position/destination to show.
+ */
+function buildLiveCardState(): LiveCardState | null {
+  const st = useTibaStore.getState();
+  if (!st.nearestStation || !st.destination) return null;
+  const view = getTripView({
+    tripPlan: st.tripPlan,
+    currentLegIndex: st.currentLegIndex,
+    nearestStationId: st.nearestStation.id,
+    destination: st.destination,
+    stationsRemaining: st.stationsRemaining,
+  });
+  if (!view) return null;
+
+  const statusText =
+    view.status === 'transfer'
+      ? view.nextLineName
+        ? `transfer · ${view.nextLineName}`
+        : 'transfer'
+      : view.status === 'arrived'
+        ? 'arriving'
+        : 'alarm armed';
+
+  return {
+    fromName: st.nearestStation.name,
+    toName: view.target?.name ?? st.destination.name,
+    stopsLeft: view.stopsLeft ?? 0,
+    statusText,
+    lineColor: view.line?.color ?? NOTIFICATION_COLOR,
+    total: view.progress.total,
+    current: view.progress.current,
+  };
+}
+
+/**
  * Dismiss the persistent live-tracking notification.
  */
 export async function clearLiveNotification(): Promise<void> {
@@ -163,10 +180,11 @@ Notifications.addNotificationResponseReceivedListener((response) => {
     return;
   }
 
-  // Tapping the alarm (or its body) opens the full-screen alarm.
+  // Tapping the alarm (or its body) brings up the full-screen alarm overlay,
+  // which the root layout renders whenever isAlarmActive is true.
   const isAlarmNotification = notification.request.content.data?.alarm === true;
   if (isAlarmNotification) {
-    router.push('/alarm-trigger');
+    useTibaStore.setState({ isAlarmActive: true });
   }
 });
 
@@ -203,64 +221,54 @@ TaskManager.defineTask<LocationTaskData>(
         updateNearestStation(position);
         updateDirectionDetection();
 
+        // Shared with the foreground path: recompute progress, buzz the
+        // threshold heads-up (inside evaluateTrip), and arm the transfer/arrival
+        // alarm.
+        const { stationsRemaining, triggered } = evaluateTrip();
         const newState = useTibaStore.getState();
-        const { nearestStation, destination, direction, currentLine } = newState;
+        const { nearestStation, destination, tripPlan, currentLegIndex } = newState;
 
-        let stationsRemaining: number | null = null;
-        if (nearestStation && destination && direction && currentLine) {
-          stationsRemaining = calculateStationsRemaining(
-            nearestStation,
-            destination,
-            direction,
-            currentLine.id
-          );
-          useTibaStore.setState({ stationsRemaining });
+        if (triggered) {
+          const leg = tripPlan?.legs[currentLegIndex];
+          const isTransfer = triggered === 'transfer';
+          const alightName =
+            getStationById(leg?.toStationId ?? '')?.name ?? destination?.name ?? 'your stop';
+          const nextLineName = isTransfer
+            ? getLineById(tripPlan?.legs[currentLegIndex + 1]?.lineId as LineId)?.name
+            : undefined;
+
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: isTransfer ? `TRANSFER: ${alightName}` : `ARRIVED: ${alightName}`,
+              body: isTransfer
+                ? `Change here${nextLineName ? ` · ${nextLineName}` : ''} · get ready`
+                : 'You have arrived · prepare to alight',
+              sound: true,
+              data: { alarm: true },
+              color: NOTIFICATION_COLOR,
+              priority: Notifications.AndroidNotificationPriority.MAX,
+              ...Platform.select({
+                ios: {
+                  interruptionLevel: 'critical' as const,
+                },
+              }),
+            },
+            trigger: { channelId: ALARM_CHANNEL_ID },
+          });
         }
 
-        const { alarmThreshold, isAlarmActive } = newState;
-        if (
-          !isAlarmActive &&
-          nearestStation &&
-          destination &&
-          currentLine &&
-          direction &&
-          stationsRemaining !== null
-        ) {
-          const shouldTrigger = checkAlarmTrigger(
-            nearestStation,
-            destination,
-            currentLine,
-            direction,
-            alarmThreshold
-          );
-
-          if (shouldTrigger && lastAlarmStationId !== nearestStation.id) {
-            lastAlarmStationId = nearestStation.id;
-            useTibaStore.setState({ isAlarmActive: true });
-
-            await Notifications.scheduleNotificationAsync({
-              content: {
-                title: `ARRIVING: ${destination.name}`,
-                body: `${stationsRemaining} ${stationsRemaining === 1 ? 'station' : 'stations'} remaining · prepare to alight`,
-                sound: true,
-                data: { alarm: true },
-                color: NOTIFICATION_COLOR,
-                priority: Notifications.AndroidNotificationPriority.MAX,
-                ...Platform.select({
-                  ios: {
-                    interruptionLevel: 'critical' as const,
-                  },
-                }),
-              },
-              trigger: { channelId: ALARM_CHANNEL_ID },
-            });
-          }
-        }
+        // Rich lock-screen card (iOS Live Activity / Android custom notification).
+        const cardState = buildLiveCardState();
+        if (cardState) updateLiveCard(cardState);
 
         const currentStationId = nearestStation?.id || null;
         if (currentStationId !== lastNotifiedStationId) {
           lastNotifiedStationId = currentStationId;
-          await updateLiveNotification(nearestStation, destination, stationsRemaining);
+          // Fall back to the plain text notification only when the rich card
+          // isn't available (Expo Go, web, iOS < 16.1).
+          if (!isLiveCardActive()) {
+            await updateLiveNotification(nearestStation, destination, stationsRemaining);
+          }
         }
       } catch (taskError) {
         // Silently handle errors in background task
@@ -288,6 +296,7 @@ export async function startBackgroundTracking(): Promise<void> {
       return;
     }
 
+    // Foreground permission is mandatory — without it we can't read location.
     const foregroundStatus = await Location.getForegroundPermissionsAsync();
     if (!foregroundStatus.granted) {
       const foregroundRequest = await Location.requestForegroundPermissionsAsync();
@@ -296,16 +305,23 @@ export async function startBackgroundTracking(): Promise<void> {
       }
     }
 
+    // Background ("Allow all the time") is best-effort. If the user doesn't
+    // grant it, we still track via a foreground watch while the app is open
+    // rather than doing nothing — the in-app alarm works either way. Otherwise
+    // declining the Android background prompt made "Start Tracking" a no-op.
     const backgroundStatus = await Location.getBackgroundPermissionsAsync();
-    if (!backgroundStatus.granted) {
-      const backgroundRequest = await Location.requestBackgroundPermissionsAsync();
-      if (!backgroundRequest.granted) {
-        return;
-      }
+    let backgroundGranted = backgroundStatus.granted;
+    if (!backgroundGranted) {
+      backgroundGranted = (await Location.requestBackgroundPermissionsAsync()).granted;
+    }
+    if (!backgroundGranted) {
+      await startForegroundTracking();
+      return;
     }
 
     const isRegistered = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
     if (isRegistered) {
+      useTibaStore.setState({ isTracking: true });
       return;
     }
 
@@ -327,12 +343,15 @@ export async function startBackgroundTracking(): Promise<void> {
 
     useTibaStore.setState({ isTracking: true });
 
-    const state = useTibaStore.getState();
-    await updateLiveNotification(
-      state.nearestStation,
-      state.destination,
-      state.stationsRemaining
-    );
+    // Kick off the rich lock-screen card; fall back to the text notification
+    // only if the native card isn't available.
+    const cardState = buildLiveCardState();
+    if (cardState) startLiveCard(cardState);
+
+    if (!isLiveCardActive()) {
+      const state = useTibaStore.getState();
+      await updateLiveNotification(state.nearestStation, state.destination, state.stationsRemaining);
+    }
   } catch (error) {
     useTibaStore.setState({ isTracking: false });
   }
@@ -356,10 +375,10 @@ export async function stopBackgroundTracking(): Promise<void> {
       }
     }
 
+    endLiveCard();
     await clearLiveNotification();
 
     lastNotifiedStationId = null;
-    lastAlarmStationId = null;
     resetDetectionState();
 
     useTibaStore.setState({ isTracking: false });

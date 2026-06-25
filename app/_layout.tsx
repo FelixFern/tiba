@@ -5,8 +5,10 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import DevTools from '../components/DevTools';
-import { colors } from '../lib/theme';
+import AlarmOverlay from '../components/AlarmOverlay';
 import { configureNotifications } from '../lib/notifications';
+import { useTibaStore } from '../lib/store';
+import { useTheme } from '../lib/use-theme';
 // Importing registers the background location task + notification response
 // listener at startup, so alarms/actions work regardless of which tab opened.
 import '../lib/background-location';
@@ -18,6 +20,12 @@ export default function RootLayout() {
     'JetBrainsMono-Regular': require('../assets/fonts/JetBrainsMono-Regular.ttf'),
     'JetBrainsMono-Bold': require('../assets/fonts/JetBrainsMono-Bold.ttf'),
   });
+
+  // Render the alarm as a store-gated overlay rather than a navigated route, so
+  // arming/dismissing it never transitions screens (which previously flashed a
+  // blank screen on dismiss). It covers the whole app, including the tab bar.
+  const isAlarmActive = useTibaStore((s) => s.isAlarmActive);
+  const theme = useTheme();
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -35,21 +43,13 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: colors.monoBg }}>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }}>
+      <View style={{ flex: 1, backgroundColor: theme.bg }}>
+        <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.bg } }}>
           <Stack.Screen name="(tabs)" />
-          <Stack.Screen
-            name="alarm-trigger"
-            options={{
-              presentation: 'fullScreenModal',
-              gestureEnabled: false,
-              headerShown: false,
-              animation: 'fade',
-            }}
-          />
         </Stack>
         <DevTools />
+        {isAlarmActive && <AlarmOverlay />}
       </View>
     </SafeAreaProvider>
   );

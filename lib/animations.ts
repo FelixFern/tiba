@@ -263,6 +263,33 @@ export function useEntryAnimation({
 }
 
 // ---------------------------------------------------------------------------
+// 11b. Pulse ring — expanding + fading concentric ring (alarm screen)
+// ---------------------------------------------------------------------------
+
+export function usePulseRing(
+  active: boolean,
+  { delay = 0, duration = 2800, minScale = 0.85, maxScale = 2.3 } = {},
+) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    if (active) {
+      progress.value = withDelay(
+        delay,
+        withRepeat(withTiming(1, { duration, easing: Easing.out(Easing.ease) }), -1, false),
+      );
+    } else {
+      progress.value = 0;
+    }
+  }, [active, progress, delay, duration]);
+
+  return useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(progress.value, [0, 1], [minScale, maxScale]) }],
+    opacity: interpolate(progress.value, [0, 0.8, 1], [0.55, 0, 0]),
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // 11. Dim transition — for passed stations
 // ---------------------------------------------------------------------------
 
