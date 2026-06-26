@@ -1,5 +1,6 @@
 package expo.modules.tibalivenotification
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -7,6 +8,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
+import android.service.notification.StatusBarNotification
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
@@ -29,9 +31,12 @@ class LiveState : Record {
 class TibaLiveNotificationModule : Module() {
   // Reuses the silent ongoing channel created by the JS notifications layer.
   private val channelId = "tiba-live"
-  private val notificationId = 0x71BA
+  private val defaultNotificationId = 0x71BA
   private val maxDots = 8
   private val dimColor = Color.parseColor("#3A3A3A")
+  // The id we last posted to — either the foreground-service notification's id
+  // (while tracking) or the standalone id (dev preview).
+  private var lastPostedId = 0x71BA
 
   override fun definition() = ModuleDefinition {
     Name("TibaLiveNotification")
@@ -70,7 +75,16 @@ class TibaLiveNotificationModule : Module() {
           }
         }
 
-        val notification = NotificationCompat.Builder(ctx, channelId)
+        // If expo-location's foreground-service notification is live, render the
+        // card AS that notification (same id + channel) so there's a single,
+        // non-dismissable card tied to the tracking service — instead of a
+        // separate "Detecting location" text notification beside it. Outside
+        // tracking (dev preview) fall back to a standalone notification.
+        val fg = foregroundNotification(ctx)
+        val targetChannel = fg?.notification?.channelId ?: channelId
+        val targetId = fg?.id ?: defaultNotificationId
+
+        val notification = NotificationCompat.Builder(ctx, targetChannel)
           .setSmallIcon(smallIconRes(ctx))
           .setColor(color)
           .setOngoing(true)
@@ -86,17 +100,37 @@ class TibaLiveNotificationModule : Module() {
           .setCustomBigContentView(views)
           .build()
 
-        notificationManager(ctx).notify(notificationId, notification)
+        val nm = notificationManager(ctx)
+        // Once we've consolidated onto the service notification, drop any
+        // standalone card posted before the service notification appeared.
+        if (targetId != defaultNotificationId) nm.cancel(defaultNotificationId)
+        nm.notify(targetId, notification)
+        lastPostedId = targetId
       }
     }
 
     Function("end") {
       val ctx = appContext.reactContext
       if (ctx != null) {
-        notificationManager(ctx).cancel(notificationId)
+        val nm = notificationManager(ctx)
+        nm.cancel(defaultNotificationId)
+        if (lastPostedId != defaultNotificationId) nm.cancel(lastPostedId)
+        lastPostedId = defaultNotificationId
       }
     }
   }
+
+  // The active foreground-service notification posted by our package (expo-location's
+  // tracking notification), if any — so the card can take its place.
+  private fun foregroundNotification(ctx: Context): StatusBarNotification? =
+    try {
+      notificationManager(ctx).activeNotifications.firstOrNull { sbn ->
+        sbn.packageName == ctx.packageName &&
+          (sbn.notification.flags and Notification.FLAG_FOREGROUND_SERVICE) != 0
+      }
+    } catch (e: Exception) {
+      null
+    }
 
   private fun parseColor(hex: String): Int =
     try { Color.parseColor(hex) } catch (e: Exception) { Color.parseColor("#3B82F6") }

@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import { useAnimatedCounter, usePulse, useSpringPress, useFlowDown } from '../../lib/animations';
-import { fonts, spacing, fontSize, badgeColors, withAlpha, type Theme } from '../../lib/theme';
+import { fonts, spacing, fontSize, badgeColors, readableTextOn, withAlpha, type Theme } from '../../lib/theme';
 import { useTheme } from '../../lib/use-theme';
 import { useTibaStore } from '../../lib/store';
 import { refreshCurrentLocationOnce } from '../../lib/location';
@@ -388,14 +388,12 @@ export default function HomeScreen() {
       ) : (
         <View style={styles.noDestinationContainer}>
           <Text style={styles.noDestinationTitle}>No destination armed</Text>
-          <Pressable onPress={() => router.push('/(tabs)/alarm')} style={styles.setDestinationButton}>
-            <Text style={styles.setDestinationText}>SET DESTINATION</Text>
-            <Ionicons name="arrow-forward" size={15} color={theme.accent} />
-          </Pressable>
+          <Text style={styles.noDestinationHint}>Pick where you&apos;re heading to arm the alarm</Text>
         </View>
       )}
 
-      {/* Bottom tracking button */}
+      {/* Bottom action button — STOP while tracking, SET DESTINATION when none is
+          armed (tracking needs a destination), otherwise START. */}
       {isTracking ? (
         <Animated.View style={[styles.buttonWrap, stopPressStyle]}>
           <Pressable
@@ -405,6 +403,17 @@ export default function HomeScreen() {
             style={styles.buttonStop}
           >
             <Text style={styles.buttonStopText}>STOP TRACKING</Text>
+          </Pressable>
+        </Animated.View>
+      ) : !destination ? (
+        <Animated.View style={[styles.buttonWrap, startPressStyle]}>
+          <Pressable
+            onPress={() => router.push('/(tabs)/alarm')}
+            onPressIn={startPressIn}
+            onPressOut={startPressOut}
+            style={styles.buttonStart}
+          >
+            <Text style={styles.buttonStartText}>SET DESTINATION</Text>
           </Pressable>
         </Animated.View>
       ) : (
@@ -728,25 +737,16 @@ const makeStyles = (t: Theme) =>
     gap: spacing.lg,
   },
   noDestinationTitle: {
-    fontFamily: fonts.regular,
-    fontSize: fontSize.lg,
-    color: t.dim,
-  },
-  setDestinationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: t.border,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: 3,
-  },
-  setDestinationText: {
     fontFamily: fonts.bold,
+    fontSize: fontSize.lg,
+    color: t.textMuted,
+  },
+  noDestinationHint: {
+    fontFamily: fonts.regular,
     fontSize: fontSize.md,
-    color: t.accent,
-    letterSpacing: 1.5,
+    color: t.dim,
+    textAlign: 'center',
+    paddingHorizontal: spacing.xl,
   },
 
   // Bottom button
@@ -765,7 +765,7 @@ const makeStyles = (t: Theme) =>
   buttonStartText: {
     fontFamily: fonts.bold,
     fontSize: fontSize.body,
-    color: '#0A0A0A',
+    color: readableTextOn(t.accent),
     letterSpacing: 1.8,
   },
   buttonStop: {

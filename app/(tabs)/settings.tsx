@@ -373,7 +373,7 @@ const makeStyles = (t: Theme) =>
     alignItems: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: badgeColors.granted,
+    borderColor: t.accent,
     borderRadius: 2,
     paddingVertical: 4,
     paddingHorizontal: 8,
@@ -382,12 +382,12 @@ const makeStyles = (t: Theme) =>
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: badgeColors.granted,
+    backgroundColor: t.accent,
   },
   grantedText: {
     fontFamily: fonts.bold,
     fontSize: fontSize.sm,
-    color: badgeColors.granted,
+    color: t.accent,
     letterSpacing: 1,
   },
 
