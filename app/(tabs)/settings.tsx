@@ -3,14 +3,15 @@ import Constants from 'expo-constants';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useTibaStore } from '../../lib/store';
 import { stopBackgroundTracking } from '../../lib/background-location';
-import { accentOptions, badgeColors, fontSize, fonts, spacing, type Theme } from '../../lib/theme';
+import { accentOptions, badgeColors, fontSize, fonts, readableTextOn, spacing, type Theme } from '../../lib/theme';
 import { useTheme } from '../../lib/use-theme';
 import { useSpringPress } from '../../lib/animations';
 import PageHeader from '../../components/PageHeader';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 
 function AnimatedPressable({
   onPress,
@@ -71,6 +72,7 @@ export default function SettingsScreen() {
   const [locationStatus, setLocationStatus] = useState<'granted' | 'denied'>('denied');
   const [notificationStatus, setNotificationStatus] = useState<'granted' | 'denied'>('denied');
   const [isLoading, setIsLoading] = useState(false);
+  const [clearVisible, setClearVisible] = useState(false);
 
   useEffect(() => {
     checkPermissions();
@@ -115,24 +117,13 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleClearData = () => {
-    Alert.alert(
-      'Clear saved trip',
-      'This clears your saved destination and current route, and stops tracking. Your alarm threshold and theme are kept.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            const s = useTibaStore.getState();
-            if (s.isTracking) await stopBackgroundTracking();
-            s.resetTrip();
-            Alert.alert('Done', 'Saved trip cleared');
-          },
-        },
-      ]
-    );
+  const handleClearData = () => setClearVisible(true);
+
+  const confirmClearData = async () => {
+    setClearVisible(false);
+    const s = useTibaStore.getState();
+    if (s.isTracking) await stopBackgroundTracking();
+    s.resetTrip();
   };
 
   const handlePreciseLocation = () => {
@@ -235,12 +226,7 @@ export default function SettingsScreen() {
       <View style={styles.card}>
         <View style={styles.aboutHeader}>
           <View style={styles.appIcon}>
-            {/* eslint-disable-next-line @typescript-eslint/no-require-imports */}
-            <Image
-              source={require('../../assets/icon.png')}
-              style={styles.appIconImg}
-              resizeMode="cover"
-            />
+            <Text style={styles.appIconGlyph}>t</Text>
           </View>
           <View>
             <Text style={styles.appName}>tiba</Text>
@@ -265,6 +251,16 @@ export default function SettingsScreen() {
         <Text style={styles.clearText}>CLEAR SAVED TRIP DATA</Text>
       </AnimatedPressable>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={clearVisible}
+        title="Clear saved trip?"
+        message="This clears your saved destination and current route, and stops tracking. Your alarm threshold and theme are kept."
+        confirmLabel="Clear"
+        destructive
+        onConfirm={confirmClearData}
+        onCancel={() => setClearVisible(false)}
+      />
     </View>
   );
 }
@@ -419,15 +415,21 @@ const makeStyles = (t: Theme) =>
     padding: 16,
     paddingBottom: spacing.md,
   },
+  // Branded tile (accent square + "t") — mirrors the live-card notification
+  // tile and tracks the active accent, so it renders reliably in every build.
   appIcon: {
     width: 42,
     height: 42,
     borderRadius: 8,
-    overflow: 'hidden',
+    backgroundColor: t.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  appIconImg: {
-    width: 42,
-    height: 42,
+  appIconGlyph: {
+    fontFamily: fonts.bold,
+    fontSize: 26,
+    lineHeight: 30,
+    color: readableTextOn(t.accent),
   },
   appName: {
     fontFamily: fonts.bold,

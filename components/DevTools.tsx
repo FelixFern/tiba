@@ -3,6 +3,7 @@ import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useTibaStore } from '../lib/store';
 import { findNearestStations } from '../lib/distance';
 import { getAllStations } from '../lib/data';
+import { startLiveCard, endLiveCard } from '../lib/live-card';
 import { fonts, fontSize, spacing, type Theme } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
 
@@ -108,6 +109,26 @@ export default function DevTools() {
           }}
         >
           <Text style={styles.testBtnText}>ARM ALARM (arrival)</Text>
+        </Pressable>
+        <Pressable
+          style={styles.testBtn}
+          onPress={() => {
+            startLiveCard({
+              fromName: 'Sudimara',
+              toName: 'Tanah Abang',
+              stopsLeft: 5,
+              statusText: 'alarm armed',
+              lineColor: '#43A047',
+              total: 7,
+              current: 0,
+            });
+            setVisible(false);
+          }}
+        >
+          <Text style={styles.testBtnText}>SHOW LIVE CARD</Text>
+        </Pressable>
+        <Pressable style={styles.testBtn} onPress={() => endLiveCard()}>
+          <Text style={styles.testBtnText}>END LIVE CARD</Text>
         </Pressable>
       </ScrollView>
     </View>

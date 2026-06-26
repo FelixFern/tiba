@@ -65,6 +65,33 @@ export const lightTheme: Theme = {
 };
 
 // ----------------------------------------------------------------------------
+// Color utilities
+// ----------------------------------------------------------------------------
+
+/** Append an alpha channel to a #RRGGBB hex, returning an rgba() string. */
+export function withAlpha(hex: string, alpha: number): string {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/**
+ * Pick a legible text color (near-black or white) to sit on top of `hex`,
+ * using the WCAG relative-luminance threshold. Used for text on the accent.
+ */
+export function readableTextOn(hex: string): string {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  return luminance > 0.55 ? '#0A0A0A' : '#FFFFFF';
+}
+
+// ----------------------------------------------------------------------------
 // Constant (theme-independent) tokens
 // ----------------------------------------------------------------------------
 
@@ -114,6 +141,15 @@ export const fontSize = {
   xl: 20,
   xxl: 28,
   display: 48,
+} as const;
+
+// Corner radii — the mono design keeps corners tight; cards/controls use `sm`,
+// pills use `pill`. Matches the values already used across the screens.
+export const radius = {
+  sm: 3,
+  md: 8,
+  lg: 12,
+  pill: 999,
 } as const;
 
 // Brand badge colors — same in both themes.

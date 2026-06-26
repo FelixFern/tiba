@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
 import { useAnimatedCounter, usePulse, useSpringPress, useFlowDown } from '../../lib/animations';
-import { fonts, spacing, fontSize, badgeColors, type Theme } from '../../lib/theme';
+import { fonts, spacing, fontSize, badgeColors, withAlpha, type Theme } from '../../lib/theme';
 import { useTheme } from '../../lib/use-theme';
 import { useTibaStore } from '../../lib/store';
 import { refreshCurrentLocationOnce } from '../../lib/location';
@@ -18,14 +18,6 @@ import type { Station, LineId } from '../../lib/types';
 import PageHeader from '../../components/PageHeader';
 
 type RouteStatus = 'passed' | 'current' | 'upcoming' | 'destination' | 'transfer';
-
-/** Convert a #rrggbb hex to an rgba() string at the given alpha. */
-function withAlpha(hex: string, alpha: number): string {
-  const h = hex.replace('#', '');
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
-  const n = parseInt(full, 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-}
 
 interface RouteRow {
   station: Station;
