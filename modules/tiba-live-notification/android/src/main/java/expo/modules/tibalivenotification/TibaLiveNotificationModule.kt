@@ -1,8 +1,12 @@
 package expo.modules.tibalivenotification
 
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Color
+import android.os.Build
 import android.view.View
 import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
@@ -38,10 +42,22 @@ class TibaLiveNotificationModule : Module() {
         val color = parseColor(state.lineColor)
         val pkg = ctx.packageName
 
+        // Custom RemoteViews are inflated against the app context, so the
+        // platform's "?attr/textColorPrimary" can resolve to dark text even on a
+        // dark shade. Pick the text color from the device night mode ourselves so
+        // it always contrasts with the notification background.
+        val night = isNightMode(ctx)
+        val textPrimary = if (night) Color.parseColor("#FAFAFA") else Color.parseColor("#16181B")
+        val textSecondary = if (night) Color.parseColor("#B5B5B5") else Color.parseColor("#5A5D63")
+
         val views = RemoteViews(pkg, layoutId(ctx, "tiba_live_card"))
         views.setTextViewText(viewId(ctx, "tiba_route"), "${state.fromName}  →  ${state.toName}")
         views.setTextViewText(viewId(ctx, "tiba_status"), "${state.stopsLeft} left · ${state.statusText}")
+        views.setTextColor(viewId(ctx, "tiba_route"), textPrimary)
+        views.setTextColor(viewId(ctx, "tiba_status"), textSecondary)
+        // Tile is filled with the line color; keep the "t" glyph white for contrast.
         views.setInt(viewId(ctx, "tiba_tile"), "setColorFilter", color)
+        views.setTextColor(viewId(ctx, "tiba_tile_label"), Color.WHITE)
 
         val shown = minOf(state.total, maxDots)
         for (i in 0 until maxDots) {
@@ -57,16 +73,17 @@ class TibaLiveNotificationModule : Module() {
         val notification = NotificationCompat.Builder(ctx, channelId)
           .setSmallIcon(smallIconRes(ctx))
           .setColor(color)
-          .setColorized(true)
           .setOngoing(true)
           .setOnlyAlertOnce(true)
           .setPriority(NotificationCompat.PRIORITY_LOW)
+          // Show the full card on the lock screen (channel must also allow it).
+          .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+          // Tapping the card brings the app back to the foreground.
+          .setContentIntent(openAppIntent(ctx))
+          // The custom card is the whole body — no DecoratedCustomViewStyle chrome
+          // so the notification stays compact ("just the card").
           .setCustomContentView(views)
           .setCustomBigContentView(views)
-          // Decorate with the system notification chrome (app name, icon, time)
-          // so the card blends with the shade in both light and dark themes
-          // instead of drawing its own dark box.
-          .setStyle(NotificationCompat.DecoratedCustomViewStyle())
           .build()
 
         notificationManager(ctx).notify(notificationId, notification)
@@ -83,6 +100,20 @@ class TibaLiveNotificationModule : Module() {
 
   private fun parseColor(hex: String): Int =
     try { Color.parseColor(hex) } catch (e: Exception) { Color.parseColor("#3B82F6") }
+
+  private fun isNightMode(ctx: Context): Boolean =
+    (ctx.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+      Configuration.UI_MODE_NIGHT_YES
+
+  // Re-launch the app's main activity when the card is tapped.
+  private fun openAppIntent(ctx: Context): PendingIntent {
+    val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.apply {
+      flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+    }
+    var flags = PendingIntent.FLAG_UPDATE_CURRENT
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) flags = flags or PendingIntent.FLAG_IMMUTABLE
+    return PendingIntent.getActivity(ctx, 0, launch, flags)
+  }
 
   private fun notificationManager(ctx: Context): NotificationManager =
     ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

@@ -18,11 +18,12 @@
             android:contentDescription="tiba" />
 
         <TextView
+            android:id="@+id/tiba_tile_label"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center"
             android:text="t"
-            android:textColor="#0A0A0A"
+            android:textColor="#FFFFFF"
             android:textSize="15sp"
             android:textStyle="bold" />
     </FrameLayout>

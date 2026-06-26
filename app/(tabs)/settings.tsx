@@ -236,7 +236,11 @@ export default function SettingsScreen() {
         <View style={styles.aboutHeader}>
           <View style={styles.appIcon}>
             {/* eslint-disable-next-line @typescript-eslint/no-require-imports */}
-            <Image source={require('../../assets/icon.png')} style={styles.appIconImg} />
+            <Image
+              source={require('../../assets/icon.png')}
+              style={styles.appIconImg}
+              resizeMode="cover"
+            />
           </View>
           <View>
             <Text style={styles.appName}>tiba</Text>

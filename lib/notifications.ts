@@ -42,6 +42,8 @@ export async function configureNotifications(): Promise<void> {
         sound: undefined,
         enableVibrate: false,
         showBadge: false,
+        // Show the full live card (not a redacted placeholder) on the lock screen.
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       });
 
       // High-importance channel for the wake-up alarm.
