@@ -1,0 +1,16 @@
+R_DEF: Internal format may change without notice
+local
+drawable tiba_dot
+drawable tiba_tile
+id tiba_dot_0
+id tiba_dot_1
+id tiba_dot_2
+id tiba_dot_3
+id tiba_dot_4
+id tiba_dot_5
+id tiba_dot_6
+id tiba_dot_7
+id tiba_route
+id tiba_status
+id tiba_tile
+layout tiba_live_card

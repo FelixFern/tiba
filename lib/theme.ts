@@ -76,6 +76,21 @@ export const lineColors = {
   tanjungPriok: '#EC407A',
 } as const;
 
+// Selectable accent colors (Settings → ACCENT). `null` accentPref → the
+// palette default (`blue`). Tuned to stay legible on both light and dark fields.
+export const accentOptions = [
+  { id: 'blue', color: '#3B82F6' },
+  { id: 'indigo', color: '#6366F1' },
+  { id: 'violet', color: '#8B5CF6' },
+  { id: 'pink', color: '#EC4899' },
+  { id: 'red', color: '#EF4444' },
+  { id: 'orange', color: '#F97316' },
+  { id: 'amber', color: '#F59E0B' },
+  { id: 'green', color: '#22C55E' },
+  { id: 'teal', color: '#14B8A6' },
+  { id: 'cyan', color: '#06B6D4' },
+] as const;
+
 export const fonts = {
   regular: 'JetBrainsMono-Regular',
   bold: 'JetBrainsMono-Bold',

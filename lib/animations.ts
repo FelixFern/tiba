@@ -290,6 +290,36 @@ export function usePulseRing(
 }
 
 // ---------------------------------------------------------------------------
+// 11c. Flow — a marker travelling along a route segment (direction of travel)
+// ---------------------------------------------------------------------------
+
+export function useFlowDown(
+  active: boolean,
+  distance: number,
+  { duration = 1300 } = {},
+) {
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    if (active) {
+      progress.value = withRepeat(
+        withTiming(1, { duration, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        false,
+      );
+    } else {
+      progress.value = 0;
+    }
+  }, [active, progress, duration]);
+
+  return useAnimatedStyle(() => ({
+    transform: [{ translateY: interpolate(progress.value, [0, 1], [0, distance]) }],
+    // Fade in at the top, out at the bottom so it reads as a repeating pulse.
+    opacity: interpolate(progress.value, [0, 0.15, 0.85, 1], [0, 1, 1, 0]),
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // 11. Dim transition — for passed stations
 // ---------------------------------------------------------------------------
 

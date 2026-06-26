@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, Vibration, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAudioPlayer, setAudioModeAsync } from 'expo-audio';
@@ -54,21 +54,43 @@ export default function AlarmOverlay() {
   const { animatedStyle: dismissPressStyle, onPressIn, onPressOut } = useSpringPress(0.95);
 
   // ── Mount: start vibration + sound ────────────────────────────────────
+  // expo-audio crashes natively if play()/pause() runs against a player that
+  // has already been released by unmount. Guard every call with a mounted flag
+  // and try/catch so dismissing the alarm can't bring the app down.
+  const mountedRef = useRef(true);
   useEffect(() => {
-    Vibration.vibrate([0, 1000, 1000], true);
+    mountedRef.current = true;
 
-    void setAudioModeAsync({
+    try {
+      Vibration.vibrate([0, 1000, 1000], true);
+    } catch {
+      // ignore
+    }
+
+    setAudioModeAsync({
       playsInSilentMode: true,
       shouldPlayInBackground: true,
-    }).then(() => {
-      player.loop = true;
-      player.volume = 1.0;
-      player.play();
-    });
+    })
+      .then(() => {
+        if (!mountedRef.current) return; // unmounted before audio mode resolved
+        try {
+          player.loop = true;
+          player.volume = 1.0;
+          player.play();
+        } catch {
+          // player may have been released
+        }
+      })
+      .catch(() => {});
 
     return () => {
-      Vibration.cancel();
-      player.pause();
+      mountedRef.current = false;
+      try {
+        Vibration.cancel();
+        player.pause();
+      } catch {
+        // ignore
+      }
     };
   }, [player]);
 
@@ -79,9 +101,16 @@ export default function AlarmOverlay() {
   }, []);
 
   // ── Dismiss handler (no navigation — just store state) ────────────────
-  const handleDismiss = useCallback(async () => {
-    Vibration.cancel();
-    player.pause();
+  // Hide the overlay SYNCHRONOUSLY first (flip isAlarmActive false), then do
+  // any slower teardown. Never await before unmounting — if teardown lagged the
+  // user was left staring at the alarm / a blank transition.
+  const handleDismiss = useCallback(() => {
+    try {
+      Vibration.cancel();
+      player.pause();
+    } catch {
+      // best effort
+    }
 
     if (isTransfer) {
       // Mid-journey: advance to the next leg and keep tracking. Reset detection
@@ -90,10 +119,11 @@ export default function AlarmOverlay() {
       resetDetectionState();
       useTibaStore.setState({ isAlarmActive: false, alarmKind: null });
     } else {
-      // Final arrival: trip is over — stop tracking and reset to a clean slate.
-      // resetTrip() flips isAlarmActive false, which unmounts this overlay.
-      await stopBackgroundTracking();
+      // Final arrival: clear the trip immediately (this unmounts the overlay),
+      // then stop tracking in the background.
       resetTrip();
+      useTibaStore.setState({ isAlarmActive: false, alarmKind: null });
+      void stopBackgroundTracking();
     }
   }, [player, isTransfer, advanceLeg, resetTrip]);
 

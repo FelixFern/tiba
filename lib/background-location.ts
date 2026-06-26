@@ -330,9 +330,9 @@ export async function startBackgroundTracking(): Promise<void> {
     // Tighter cadence than before (was 50m / Balanced) for snappier station and
     // direction updates while still being battery-reasonable for a train ride.
     await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-      accuracy: Location.Accuracy.High,
-      timeInterval: 5000,
-      distanceInterval: 20,
+      accuracy: Location.Accuracy.BestForNavigation,
+      timeInterval: 2000,
+      distanceInterval: 10,
       foregroundService: {
         notificationTitle: 'tiba · tracking',
         notificationBody: 'Detecting location…',

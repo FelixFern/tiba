@@ -1,12 +1,13 @@
+import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useTibaStore } from '../../lib/store';
-import { storage } from '../../lib/storage';
-import { badgeColors, fontSize, fonts, spacing, type Theme } from '../../lib/theme';
+import { stopBackgroundTracking } from '../../lib/background-location';
+import { accentOptions, badgeColors, fontSize, fonts, spacing, type Theme } from '../../lib/theme';
 import { useTheme } from '../../lib/use-theme';
 import { useSpringPress } from '../../lib/animations';
 import PageHeader from '../../components/PageHeader';
@@ -64,6 +65,9 @@ export default function SettingsScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const themePref = useTibaStore((s) => s.themePref);
   const setThemePref = useTibaStore((s) => s.setThemePref);
+  const accentPref = useTibaStore((s) => s.accentPref);
+  const setAccentPref = useTibaStore((s) => s.setAccentPref);
+  const activeAccent = accentPref ?? accentOptions[0].color;
   const [locationStatus, setLocationStatus] = useState<'granted' | 'denied'>('denied');
   const [notificationStatus, setNotificationStatus] = useState<'granted' | 'denied'>('denied');
   const [isLoading, setIsLoading] = useState(false);
@@ -113,17 +117,18 @@ export default function SettingsScreen() {
 
   const handleClearData = () => {
     Alert.alert(
-      'Clear All Data',
-      'This will reset your destination, alarm threshold, and all settings. Are you sure?',
+      'Clear saved trip',
+      'This clears your saved destination and current route, and stops tracking. Your alarm threshold and theme are kept.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Clear',
           style: 'destructive',
-          onPress: () => {
-            storage.clearAll();
-            useTibaStore.getState().resetStore();
-            Alert.alert('Success', 'All data cleared');
+          onPress: async () => {
+            const s = useTibaStore.getState();
+            if (s.isTracking) await stopBackgroundTracking();
+            s.resetTrip();
+            Alert.alert('Done', 'Saved trip cleared');
           },
         },
       ]
@@ -203,12 +208,35 @@ export default function SettingsScreen() {
         })}
       </View>
 
+      {/* ACCENT */}
+      <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>ACCENT</Text>
+      <View style={styles.swatchGrid}>
+        {accentOptions.map((opt) => {
+          const active = activeAccent.toLowerCase() === opt.color.toLowerCase();
+          return (
+            <Pressable
+              key={opt.id}
+              onPress={() => setAccentPref(opt.id === 'blue' ? null : opt.color)}
+              style={[
+                styles.swatch,
+                { borderColor: active ? opt.color : 'transparent' },
+              ]}
+            >
+              <View style={[styles.swatchFill, { backgroundColor: opt.color }]}>
+                {active && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+
       {/* ABOUT */}
       <Text style={[styles.sectionLabel, styles.sectionLabelSpaced]}>ABOUT</Text>
       <View style={styles.card}>
         <View style={styles.aboutHeader}>
           <View style={styles.appIcon}>
-            <Text style={styles.appIconText}>t</Text>
+            {/* eslint-disable-next-line @typescript-eslint/no-require-imports */}
+            <Image source={require('../../assets/icon.png')} style={styles.appIconImg} />
           </View>
           <View>
             <Text style={styles.appName}>tiba</Text>
@@ -281,6 +309,26 @@ const makeStyles = (t: Theme) =>
   },
   segmentTextActive: {
     color: '#0A0A0A',
+  },
+
+  // Accent swatches
+  swatchGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  swatch: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    padding: 3,
+  },
+  swatchFill: {
+    flex: 1,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Cards
@@ -371,14 +419,11 @@ const makeStyles = (t: Theme) =>
     width: 42,
     height: 42,
     borderRadius: 8,
-    backgroundColor: t.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  appIconText: {
-    fontFamily: fonts.bold,
-    fontSize: 24,
-    color: '#0A0A0A',
+  appIconImg: {
+    width: 42,
+    height: 42,
   },
   appName: {
     fontFamily: fonts.bold,

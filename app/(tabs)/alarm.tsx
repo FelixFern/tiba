@@ -1,22 +1,24 @@
-import { useMemo, useCallback, useState } from 'react';
-import { View, Text, StyleSheet, SectionList, Pressable, TextInput } from 'react-native';
-import Animated from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { router } from 'expo-router';
-import { fonts, spacing, fontSize, type Theme } from '../../lib/theme';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { fonts, fontSize, spacing, type Theme } from '../../lib/theme';
 import { useTheme } from '../../lib/use-theme';
-import { getAllLines, getStationsByLine, getLineById, getStationById } from '../../lib/data';
-import { planRoute } from '../../lib/transit';
-import { useTibaStore } from '../../lib/store';
+
+import PageHeader from '../../components/PageHeader';
+import { useScaleEntrance, useSlideTransition, useSpringPress } from '../../lib/animations';
 import {
   startBackgroundTracking,
   stopBackgroundTracking,
 } from '../../lib/background-location';
-import { useScaleEntrance, useSpringPress, useSlideTransition } from '../../lib/animations';
+import { getAllLines, getStationById, getStationsByLine } from '../../lib/data';
+import { resetDetectionState } from '../../lib/location';
+import { useTibaStore } from '../../lib/store';
+import { planRoute } from '../../lib/transit';
 import type { Station } from '../../lib/types';
-import PageHeader from '../../components/PageHeader';
 
 function StationRow({ item, isSelected, onSelect }: { item: Station; isSelected: boolean; onSelect: (s: Station) => void }) {
   const checkStyle = useScaleEntrance(isSelected);
@@ -100,6 +102,9 @@ export default function AlarmScreen() {
   const handleSelectStation = useCallback(
     (station: Station) => {
       setDestination(station);
+      // Clear the route-detection buffers so the new destination re-plans and
+      // re-detects from scratch.
+      resetDetectionState();
     },
     [setDestination],
   );
@@ -141,85 +146,7 @@ export default function AlarmScreen() {
         </View>
       </View>
 
-      {/* Destination Card */}
-      {destination && (
-        <Animated.View style={[styles.destinationCard, cardSlideStyle]}>
-          <View style={styles.destinationInfo}>
-            <Text style={styles.destinationLabel}>DESTINATION</Text>
-            <View style={styles.destinationNameRow}>
-              {destinationLine && (
-                <View
-                  style={[styles.destinationDot, { backgroundColor: destinationLine.color }]}
-                />
-              )}
-              <Text style={styles.destinationStation}>{destination.name}</Text>
-              {destinationLine && (
-                <Text style={styles.destinationLineText}>
-                  {destinationLine.name.toUpperCase()}
-                </Text>
-              )}
-            </View>
-          </View>
-          <Pressable onPress={handleClearDestination} style={styles.clearButton}>
-            <Ionicons name="close" size={16} color={theme.textMuted} />
-          </Pressable>
-        </Animated.View>
-      )}
-
-      {/* Route preview — shown when a transfer is required */}
-      {routePlan && routePlan.legs.length > 1 && (
-        <View style={styles.routePreview}>
-          <Text style={styles.routePreviewLabel}>
-            ROUTE · {routePlan.legs.length - 1} TRANSFER
-            {routePlan.legs.length - 1 === 1 ? '' : 'S'}
-          </Text>
-          {routePlan.legs.map((leg, i) => {
-            const line = getLineById(leg.lineId);
-            const from = getStationById(leg.fromStationId)?.name ?? leg.fromStationId;
-            const to = getStationById(leg.toStationId)?.name ?? leg.toStationId;
-            return (
-              <View key={`${leg.lineId}-${i}`} style={styles.routePreviewLeg}>
-                <View
-                  style={[styles.routePreviewDot, { backgroundColor: line?.color ?? theme.textDim }]}
-                />
-                <Text style={styles.routePreviewLine} numberOfLines={1}>
-                  {line?.name ?? leg.lineId}
-                </Text>
-                <Text style={styles.routePreviewStations} numberOfLines={1}>
-                  {from} → {to}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      {/* Threshold Section */}
-      <View style={styles.thresholdSection}>
-        <View style={styles.thresholdHeader}>
-          <Text style={styles.thresholdLabel}>ALERT THRESHOLD</Text>
-          <Text style={styles.thresholdValue}>
-            {alarmThreshold} stations before
-          </Text>
-        </View>
-        <Slider
-          style={styles.slider}
-          value={alarmThreshold}
-          onValueChange={(v: number) => setAlarmThreshold(Math.round(v))}
-          minimumValue={1}
-          maximumValue={10}
-          step={1}
-          minimumTrackTintColor={theme.accent}
-          maximumTrackTintColor={theme.dim}
-          thumbTintColor={theme.fg}
-        />
-        <View style={styles.sliderLabels}>
-          <Text style={styles.sliderLabel}>1</Text>
-          <Text style={styles.sliderLabel}>10</Text>
-        </View>
-      </View>
-
-      {/* Station List */}
+      {/* Station List — the primary picker; takes all remaining space */}
       <SectionList
         sections={sections}
         keyExtractor={(item, index) => `${item.id}_${index}`}
@@ -248,8 +175,59 @@ export default function AlarmScreen() {
         )}
       />
 
-      {/* CTA Button */}
-      <View style={[styles.ctaContainer, { paddingBottom: insets.bottom + spacing.md }]}>
+      {/* Trip footer — compact destination + route + threshold + CTA */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
+        {destination && (
+          <Animated.View style={[styles.tripBar, cardSlideStyle]}>
+            {/* Destination (one line) */}
+            <View style={styles.tripDestRow}>
+              {destinationLine && (
+                <View style={[styles.tripDot, { backgroundColor: destinationLine.color }]} />
+              )}
+              <Text style={styles.tripDestName} numberOfLines={1}>
+                {destination.name}
+              </Text>
+              {destinationLine && (
+                <Text style={styles.tripDestLine}>{destinationLine.name.toUpperCase()}</Text>
+              )}
+              <Pressable onPress={handleClearDestination} style={styles.tripClear} hitSlop={10}>
+                <Ionicons name="close" size={16} color={theme.textMuted} />
+              </Pressable>
+            </View>
+
+            {/* Route summary (one line) when a transfer is required */}
+            {routePlan && routePlan.legs.length > 1 && (
+              <Text style={styles.tripRoute} numberOfLines={1}>
+                via{' '}
+                {routePlan.legs
+                  .slice(0, -1)
+                  .map((l) => getStationById(l.toStationId)?.name ?? l.toStationId)
+                  .join(' · ')}{' '}
+                · {routePlan.legs.length - 1} transfer{routePlan.legs.length - 1 === 1 ? '' : 's'}
+              </Text>
+            )}
+
+            {/* Threshold (compact inline slider) */}
+            <View style={styles.thresholdRow}>
+              <Text style={styles.thresholdLabel}>ALERT</Text>
+              <Slider
+                style={styles.sliderInline}
+                value={alarmThreshold}
+                onValueChange={(v: number) => setAlarmThreshold(Math.round(v))}
+                minimumValue={1}
+                maximumValue={10}
+                step={1}
+                minimumTrackTintColor={theme.accent}
+                maximumTrackTintColor={theme.dim}
+                thumbTintColor={theme.fg}
+              />
+              <Text style={styles.thresholdValue}>
+                {alarmThreshold} stop{alarmThreshold === 1 ? '' : 's'}
+              </Text>
+            </View>
+          </Animated.View>
+        )}
+
         <Pressable
           onPress={handleStartTrip}
           style={[styles.ctaButton, !destination && styles.ctaButtonDisabled]}
@@ -265,244 +243,296 @@ export default function AlarmScreen() {
 
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: t.bg,
-  },
-  searchContainer: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    height: 44,
-    borderWidth: 1,
-    borderColor: t.border,
-    borderRadius: 3,
-    paddingHorizontal: 14,
-  },
-  searchInput: {
-    flex: 1,
-    fontFamily: fonts.regular,
-    fontSize: fontSize.body,
-    color: t.fg,
-    padding: 0,
-  },
-  destinationCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.lg,
-    backgroundColor: 'rgba(59,130,246,0.08)',
-    borderWidth: 1,
-    borderColor: t.accent,
-    borderRadius: 3,
-    padding: 14,
-  },
-  destinationInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  destinationLabel: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.sm,
-    color: t.accent,
-    letterSpacing: 1.8,
-  },
-  destinationNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-  },
-  destinationDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-  },
-  destinationStation: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.xl,
-    color: t.fg,
-    letterSpacing: -0.5,
-  },
-  destinationLineText: {
-    fontFamily: fonts.regular,
-    fontSize: fontSize.sm,
-    color: t.textMuted,
-    letterSpacing: 1,
-  },
-  clearButton: {
-    width: 30,
-    height: 30,
-    borderWidth: 1,
-    borderColor: t.border,
-    borderRadius: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.md,
-  },
-  thresholdSection: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.lg,
-  },
-  thresholdHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  thresholdLabel: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.md,
-    color: t.textMuted,
-    letterSpacing: 1.5,
-  },
-  thresholdValue: {
-    fontFamily: fonts.regular,
-    fontSize: fontSize.md,
-    color: t.fg,
-  },
-  slider: {
-    width: '100%',
-    height: 40,
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sliderLabel: {
-    fontFamily: fonts.regular,
-    fontSize: fontSize.sm,
-    color: t.dim,
-  },
-  stationList: {
-    flex: 1,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm + 1,
-    backgroundColor: t.sectionBg,
-  },
-  sectionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  sectionHeaderRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  routePreview: {
-    marginHorizontal: spacing.xl,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: t.border,
-    borderRadius: 3,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  routePreviewLabel: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.sm,
-    color: t.textMuted,
-    letterSpacing: 1.6,
-    marginBottom: spacing.xs,
-  },
-  routePreviewLeg: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  routePreviewDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  routePreviewLine: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.sm,
-    color: t.fg,
-    width: 96,
-  },
-  routePreviewStations: {
-    flex: 1,
-    fontFamily: fonts.regular,
-    fontSize: fontSize.sm,
-    color: t.textDim,
-  },
-  sectionBar: {
-    width: 3,
-    height: 14,
-  },
-  sectionTitle: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.md,
-    color: t.fg,
-    letterSpacing: 1.5,
-  },
-  stationCount: {
-    fontFamily: fonts.regular,
-    fontSize: fontSize.sm,
-    color: t.dim,
-  },
-  stationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 13,
-    paddingHorizontal: spacing.xl,
-    borderBottomWidth: 1,
-    borderBottomColor: t.divider,
-  },
-  stationRowSelected: {
-    backgroundColor: 'rgba(59,130,246,0.10)',
-    borderLeftWidth: 3,
-    borderLeftColor: t.accent,
-    paddingLeft: spacing.xl - 3,
-  },
-  stationName: {
-    fontFamily: fonts.regular,
-    fontSize: fontSize.body + 1,
-    color: t.fg,
-    flex: 1,
-  },
-  stationNameSelected: {
-    fontFamily: fonts.bold,
-  },
-  checkmark: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.body,
-    color: t.accent,
-  },
-  ctaContainer: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: t.divider,
-  },
-  ctaButton: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    backgroundColor: t.accent,
-    height: 56,
-    borderRadius: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ctaButtonText: {
-    fontFamily: fonts.bold,
-    fontSize: fontSize.body,
-    color: '#0A0A0A',
-    letterSpacing: 1.5,
-  },
-  ctaButtonDisabled: {
-    opacity: 0.4,
-  },
-});
+    container: {
+      flex: 1,
+      backgroundColor: t.bg,
+    },
+    searchContainer: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.lg,
+    },
+    searchBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 11,
+      height: 44,
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: 3,
+      paddingHorizontal: 14,
+    },
+    searchInput: {
+      flex: 1,
+      fontFamily: fonts.regular,
+      fontSize: fontSize.body,
+      color: t.fg,
+      padding: 0,
+    },
+    destinationCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginHorizontal: spacing.xl,
+      marginBottom: spacing.lg,
+      backgroundColor: 'rgba(59,130,246,0.08)',
+      borderWidth: 1,
+      borderColor: t.accent,
+      borderRadius: 3,
+      padding: 14,
+    },
+    destinationInfo: {
+      flex: 1,
+      gap: 6,
+    },
+    destinationLabel: {
+      fontFamily: fonts.bold,
+      fontSize: fontSize.sm,
+      color: t.accent,
+      letterSpacing: 1.8,
+    },
+    destinationNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 9,
+    },
+    destinationDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 4.5,
+    },
+    destinationStation: {
+      fontFamily: fonts.bold,
+      fontSize: fontSize.xl,
+      color: t.fg,
+      letterSpacing: -0.5,
+    },
+    destinationLineText: {
+      fontFamily: fonts.regular,
+      fontSize: fontSize.sm,
+      color: t.textMuted,
+      letterSpacing: 1,
+    },
+    clearButton: {
+      width: 30,
+      height: 30,
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: 3,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: spacing.md,
+    },
+    thresholdSection: {
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.lg,
+    },
+    thresholdHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    thresholdLabel: {
+      fontFamily: fonts.bold,
+      fontSize: fontSize.md,
+      color: t.textMuted,
+      letterSpacing: 1.5,
+    },
+    thresholdValue: {
+      fontFamily: fonts.regular,
+      fontSize: fontSize.md,
+      color: t.fg,
+    },
+    slider: {
+      width: '100%',
+      height: 40,
+    },
+    sliderLabels: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    sliderLabel: {
+      fontFamily: fonts.regular,
+      fontSize: fontSize.sm,
+      color: t.dim,
+    },
+    // Compact trip footer (above the CTA)
+    footer: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: t.divider,
+      gap: spacing.md,
+    },
+    tripBar: {
+      gap: spacing.sm,
+    },
+    tripDestRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    tripDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 4.5,
+    },
+    tripDestName: {
+      flexShrink: 1,
+      fontFamily: fonts.bold,
+      fontSize: fontSize.body + 1,
+      color: t.fg,
+      letterSpacing: -0.3,
+    },
+    tripDestLine: {
+      fontFamily: fonts.regular,
+      fontSize: fontSize.sm,
+      color: t.textMuted,
+      letterSpacing: 1,
+    },
+    tripClear: {
+      marginLeft: 'auto',
+      padding: 4,
+    },
+    tripRoute: {
+      fontFamily: fonts.regular,
+      fontSize: fontSize.sm + 1,
+      color: t.textDim,
+    },
+    thresholdRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    sliderInline: {
+      flex: 1,
+      height: 36,
+    },
+    stationList: {
+      flex: 1,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.sm + 1,
+      backgroundColor: t.sectionBg,
+    },
+    sectionHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    sectionHeaderRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    routePreview: {
+      marginHorizontal: spacing.xl,
+      marginBottom: spacing.lg,
+      borderWidth: 1,
+      borderColor: t.border,
+      borderRadius: 3,
+      padding: spacing.md,
+      gap: spacing.sm,
+    },
+    routePreviewLabel: {
+      fontFamily: fonts.bold,
+      fontSize: fontSize.sm,
+      color: t.textMuted,
+      letterSpacing: 1.6,
+      marginBottom: spacing.xs,
+    },
+    routePreviewLeg: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    routePreviewDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    routePreviewLine: {
+      fontFamily: fonts.bold,
+      fontSize: fontSize.sm,
+      color: t.fg,
+      width: 96,
+    },
+    routePreviewStations: {
+      flex: 1,
+      fontFamily: fonts.regular,
+      fontSize: fontSize.sm,
+      color: t.textDim,
+    },
+    sectionBar: {
+      width: 3,
+      height: 14,
+    },
+    sectionTitle: {
+      fontFamily: fonts.bold,
+      fontSize: fontSize.md,
+      color: t.fg,
+      letterSpacing: 1.5,
+    },
+    stationCount: {
+      fontFamily: fonts.regular,
+      fontSize: fontSize.sm,
+      color: t.dim,
+    },
+    stationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 13,
+      paddingHorizontal: spacing.xl,
+      borderBottomWidth: 1,
+      borderBottomColor: t.divider,
+    },
+    stationRowSelected: {
+      backgroundColor: 'rgba(59,130,246,0.10)',
+      borderLeftWidth: 3,
+      borderLeftColor: t.accent,
+      paddingLeft: spacing.xl - 3,
+    },
+    stationName: {
+      fontFamily: fonts.regular,
+      fontSize: fontSize.body + 1,
+      color: t.fg,
+      flex: 1,
+    },
+    stationNameSelected: {
+      fontFamily: fonts.bold,
+    },
+    checkmark: {
+      fontFamily: fonts.bold,
+      fontSize: fontSize.body,
+      color: t.accent,
+    },
+    ctaContainer: {
+      paddingHorizontal: spacing.xl,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: t.divider,
+    },
+    ctaButton: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      backgroundColor: t.accent,
+      height: 56,
+      borderRadius: 3,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    ctaButtonText: {
+      fontFamily: fonts.bold,
+      fontSize: fontSize.body,
+      color: '#0A0A0A',
+      letterSpacing: 1.5,
+    },
+    ctaButtonDisabled: {
+      opacity: 0.4,
+    },
+  });

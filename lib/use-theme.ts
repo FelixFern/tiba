@@ -8,9 +8,11 @@ import { darkTheme, lightTheme, type Theme } from './theme';
  */
 export function useTheme(): Theme {
   const pref = useTibaStore((s) => s.themePref);
+  const accentPref = useTibaStore((s) => s.accentPref);
   const system = useColorScheme();
   const mode = pref === 'system' ? (system ?? 'dark') : pref;
-  return mode === 'light' ? lightTheme : darkTheme;
+  const base = mode === 'light' ? lightTheme : darkTheme;
+  return accentPref ? { ...base, accent: accentPref } : base;
 }
 
 /** The resolved 'light' | 'dark' mode (for the status bar, etc.). */

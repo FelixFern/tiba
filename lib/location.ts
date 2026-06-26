@@ -1,11 +1,12 @@
 import * as Location from 'expo-location';
 import { Vibration } from 'react-native';
-import { findNearestStations, equirectangular, StationWithDistance } from './distance';
-import { getAllStations, getLineById } from './data';
+import { findNearestStations, equirectangular } from './distance';
+import { getAllStations, getAllLines, getStationsByLine, getLineById } from './data';
 import { useTibaStore, Position } from './store';
-import { Station, LineId } from './types';
+import { Station, Line, LineId } from './types';
 import { predictDirection, inferLineFromStation } from './direction';
 import { planRoute } from './transit';
+import { projectOntoPolyline, type Projection } from './map-match';
 
 // ============================================================================
 // Types
@@ -72,27 +73,12 @@ export async function requestLocationPermissions(): Promise<boolean> {
  * physically-close station on a *parallel* line can't hijack the current line.
  */
 function activeTripLines(): LineId[] | null {
-  const { tripPlan, currentLegIndex, destination } = useTibaStore.getState();
+  const { tripPlan, currentLegIndex } = useTibaStore.getState();
   const leg = tripPlan?.legs[currentLegIndex];
-  if (leg) return [leg.lineId];
-  if (destination) return destination.lines;
-  return null;
-}
-
-/**
- * The set of station ids that make up the planned route (every leg, board →
- * alight). When a route is planned we predict position *along the route*: the
- * detected station can only be one we'll actually pass, so GPS noise can't snap
- * us to an off-route station even on the same line. Null when no route yet.
- */
-function activeRouteStationIds(): Set<string> | null {
-  const { tripPlan } = useTibaStore.getState();
-  if (!tripPlan || tripPlan.legs.length === 0) return null;
-  const ids = new Set<string>();
-  for (const leg of tripPlan.legs) {
-    for (const id of leg.stationIds) ids.add(id);
-  }
-  return ids.size > 0 ? ids : null;
+  // Only the active leg's line constrains detection. Before a trip is planned we
+  // return null so the user's real line is detected across the whole network —
+  // the destination's line is irrelevant to where they currently are.
+  return leg ? [leg.lineId] : null;
 }
 
 /**
@@ -121,71 +107,82 @@ function resolveLineForStation(station: Station): LineId {
  */
 export function updateNearestStation(position: Position): void {
   try {
-    // Candidate stations, tightest constraint first:
-    //   1. With a planned route → only stations on that route (predict by route).
-    //   2. With a destination but no route yet → stations on the destination's line(s).
-    //   3. Otherwise → every station (free position preview).
-    const allStations = getAllStations();
-    let candidates = allStations;
+    const { lat, lon } = position;
 
-    const routeIds = activeRouteStationIds();
-    if (routeIds) {
-      const onRoute = allStations.filter((s) => routeIds.has(s.id));
-      if (onRoute.length > 0) {
-        candidates = onRoute;
+    // Which lines could we be on?
+    //   - Active trip leg → just that line (don't switch lines mid-leg).
+    //   - Otherwise → every line, and let the corridor projection decide which
+    //     line we're actually riding. We must NOT constrain to the destination's
+    //     line here: on a trip that needs a transfer, the user starts out on a
+    //     *different* line (e.g. heading to Sudirman/Cikarang while currently on
+    //     the green line at Cisauk), and the route is planned from there.
+    const { tripPlan, currentLegIndex } = useTibaStore.getState();
+    const leg = tripPlan?.legs[currentLegIndex];
+    const candidateLineIds: LineId[] = leg ? [leg.lineId] : getAllLines().map((l) => l.id);
+
+    // Map-match: project the position onto each candidate line's station
+    // polyline; the line whose corridor we're closest to is the one we're
+    // actually riding (handles parallel lines), and the projection locates us
+    // between two stations rather than snapping to a station point.
+    let bestLineId: LineId | null = null;
+    let bestStations: Station[] = [];
+    let bestProj: Projection | null = null;
+    for (const lineId of candidateLineIds) {
+      const stations = getStationsByLine(lineId);
+      if (stations.length < 2) continue;
+      const proj = projectOntoPolyline(lat, lon, stations);
+      if (proj && (!bestProj || proj.distanceM < bestProj.distanceM)) {
+        bestProj = proj;
+        bestLineId = lineId;
+        bestStations = stations;
       }
+    }
+
+    let station: Station;
+    let lineForStation: Line | null;
+
+    if (bestProj && bestLineId) {
+      // Nearest station = the closer endpoint of the matched segment.
+      const a = bestStations[bestProj.segmentIndex];
+      const b = bestStations[bestProj.segmentIndex + 1];
+      const da = equirectangular(lat, lon, a.lat, a.lon);
+      const db = equirectangular(lat, lon, b.lat, b.lon);
+      let chosen = da <= db ? a : b;
+      let chosenDist = Math.min(da, db);
+
+      // Sticky hysteresis: keep the previous station unless clearly beaten —
+      // stops flicker between adjacent stops and absorbs small GPS noise.
+      if (lastNearestId && lastNearestId !== chosen.id) {
+        const prev = bestStations.find((s) => s.id === lastNearestId);
+        if (prev) {
+          const prevDist = equirectangular(lat, lon, prev.lat, prev.lon);
+          if (prevDist <= chosenDist + STICKY_MARGIN_M) {
+            chosen = prev;
+            chosenDist = prevDist;
+          }
+        }
+      }
+      station = chosen;
+      lineForStation = getLineById(bestLineId) ?? null;
     } else {
-      const active = activeTripLines();
-      if (active && active.length > 0) {
-        const onTripLines = allStations.filter((s) => s.lines.some((l) => active.includes(l)));
-        if (onTripLines.length > 0) {
-          candidates = onTripLines;
-        }
-      }
+      // Fallback: global nearest station point.
+      const nearest = findNearestStations(lat, lon, getAllStations(), 1)[0];
+      if (!nearest) return;
+      station = {
+        id: nearest.id,
+        name: nearest.name,
+        lat: nearest.lat,
+        lon: nearest.lon,
+        lines: nearest.lines,
+        sequences: nearest.sequences,
+      };
+      lineForStation = getLineById(resolveLineForStation(station)) ?? null;
     }
 
-    const nearestStations = findNearestStations(
-      position.lat,
-      position.lon,
-      candidates,
-      1
-    );
-
-    if (nearestStations.length === 0) {
-      return;
-    }
-
-    let nearest: StationWithDistance = nearestStations[0];
-
-    // Sticky hysteresis: keep the previously-reported station unless the new
-    // nearest beats it by more than the margin. Prevents flicker between two
-    // close stops and tolerates small coordinate errors.
-    if (lastNearestId && lastNearestId !== nearest.id) {
-      const prev = candidates.find((s) => s.id === lastNearestId);
-      if (prev) {
-        const prevDist = equirectangular(position.lat, position.lon, prev.lat, prev.lon);
-        if (prevDist <= nearest.distance + STICKY_MARGIN_M) {
-          nearest = { ...prev, distance: prevDist };
-        }
-      }
-    }
-    lastNearestId = nearest.id;
-
-    const station: Station = {
-      id: nearest.id,
-      name: nearest.name,
-      lat: nearest.lat,
-      lon: nearest.lon,
-      lines: nearest.lines,
-      sequences: nearest.sequences,
-    };
-
-    // Keep the current line in sync, biased to the trip line for multi-line hubs.
-    const inferredLine = getLineById(resolveLineForStation(station));
-
+    lastNearestId = station.id;
     useTibaStore.setState({
       nearestStation: station,
-      currentLine: inferredLine ?? useTibaStore.getState().currentLine,
+      currentLine: lineForStation ?? useTibaStore.getState().currentLine,
     });
   } catch (error) {
     console.error('Error updating nearest station:', error);
@@ -205,7 +202,7 @@ export async function refreshCurrentLocationOnce(): Promise<void> {
     if (!granted) return;
 
     const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
+      accuracy: Location.Accuracy.High,
     });
     const position: Position = {
       lat: location.coords.latitude,
@@ -346,9 +343,9 @@ export async function startForegroundTracking(): Promise<void> {
     // station and predicted direction stay responsive as the train moves.
     locationSubscription = await Location.watchPositionAsync(
       {
-        accuracy: Location.Accuracy.High,
-        timeInterval: 3000, // ms
-        distanceInterval: 15, // meters
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 1000, // ms — tight cadence for responsive station detection
+        distanceInterval: 5, // meters
       },
       (location) => {
         const position: Position = {

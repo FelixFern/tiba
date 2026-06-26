@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated from 'react-native-reanimated';
-import { useAnimatedCounter, usePulse, useSpringPress } from '../../lib/animations';
+import { useAnimatedCounter, usePulse, useSpringPress, useFlowDown } from '../../lib/animations';
 import { fonts, spacing, fontSize, badgeColors, type Theme } from '../../lib/theme';
 import { useTheme } from '../../lib/use-theme';
 import { useTibaStore } from '../../lib/store';
@@ -19,6 +19,14 @@ import PageHeader from '../../components/PageHeader';
 
 type RouteStatus = 'passed' | 'current' | 'upcoming' | 'destination' | 'transfer';
 
+/** Convert a #rrggbb hex to an rgba() string at the given alpha. */
+function withAlpha(hex: string, alpha: number): string {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const n = parseInt(full, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
 interface RouteRow {
   station: Station;
   status: RouteStatus;
@@ -32,6 +40,7 @@ interface RouteRow {
 export default function HomeScreen() {
   const nearestStation = useTibaStore((s) => s.nearestStation);
   const destination = useTibaStore((s) => s.destination);
+  const unlockDev = useTibaStore((s) => s.unlockDev);
   const tripPlan = useTibaStore((s) => s.tripPlan);
   const currentLegIndex = useTibaStore((s) => s.currentLegIndex);
   const stationsRemaining = useTibaStore((s) => s.stationsRemaining);
@@ -39,6 +48,21 @@ export default function HomeScreen() {
   const alarmThreshold = useTibaStore((s) => s.alarmThreshold);
 
   const scrollRef = useRef<ScrollView>(null);
+
+  // Hidden dev-tools unlock: 7 taps on the "tiba" wordmark within 1.5s.
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleTitleTap = useCallback(() => {
+    tapCountRef.current += 1;
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 1500);
+    if (tapCountRef.current >= 7) {
+      tapCountRef.current = 0;
+      unlockDev();
+    }
+  }, [unlockDev]);
   const theme = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -75,7 +99,9 @@ export default function HomeScreen() {
   const nextLineName = nextLegLineId ? getLineById(nextLegLineId)?.name : undefined;
 
   const lineColor = legLine?.color ?? theme.accent;
-  const lineLabel = legLine?.name?.toUpperCase() ?? '';
+  // Drop the redundant "LINE" suffix so the label stays short next to the
+  // "STATIONS TO GO" header.
+  const lineLabel = (legLine?.name ?? '').toUpperCase().replace(/\s*LINE$/, '');
 
   // Stops to the current leg's alight — the store value while tracking, else
   // derived from the leg's ordered segment (index-based, never negative).
@@ -133,6 +159,9 @@ export default function HomeScreen() {
 
   // Keep the current station in view as the trip progresses.
   const currentRowIndex = routeRows.findIndex((r) => r.status === 'current');
+  // A marker that flows down the rail from the current station toward the next,
+  // signalling direction of travel.
+  const flowStyle = useFlowDown(currentRowIndex >= 0, ROW_HEIGHT);
   useEffect(() => {
     if (currentRowIndex > 0 && scrollRef.current) {
       scrollRef.current.scrollTo({
@@ -206,7 +235,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <PageHeader title="tiba" right={trackingBadge} />
+      <PageHeader title="tiba" right={trackingBadge} onTitlePress={handleTitleTap} />
 
       {destination ? (
         <>
@@ -214,7 +243,11 @@ export default function HomeScreen() {
           <View style={styles.heroCard}>
             <View style={styles.heroTopRow}>
               <Text style={styles.heroLabel}>STATIONS TO GO</Text>
-              {!!lineLabel && <Text style={styles.heroLineLabel}>{lineLabel}</Text>}
+              {!!lineLabel && (
+                <Text style={styles.heroLineLabel} numberOfLines={1}>
+                  {lineLabel}
+                </Text>
+              )}
             </View>
 
             <View style={styles.heroNumberRow}>
@@ -278,10 +311,29 @@ export default function HomeScreen() {
                             style={[styles.railLineBottom, { backgroundColor: row.bottomColor }]}
                           />
                         )}
+                        {status === 'current' && !isLast && (
+                          <Animated.View
+                            pointerEvents="none"
+                            style={[styles.flowArrow, flowStyle]}
+                          >
+                            <Ionicons name="chevron-down" size={14} color={row.bottomColor} />
+                          </Animated.View>
+                        )}
                         <View style={styles.railDotWrap}>
                           {status === 'current' ? (
-                            <View style={styles.dotCurrentGlow}>
-                              <Animated.View style={[styles.dotCurrent, pulseStyle]} />
+                            <View
+                              style={[
+                                styles.dotCurrentGlow,
+                                { backgroundColor: withAlpha(row.dotColor, 0.18) },
+                              ]}
+                            >
+                              <Animated.View
+                                style={[
+                                  styles.dotCurrent,
+                                  { backgroundColor: row.dotColor },
+                                  pulseStyle,
+                                ]}
+                              />
                             </View>
                           ) : status === 'destination' ? (
                             <View style={[styles.dotDestination, { borderColor: row.dotColor }]} />
@@ -308,7 +360,11 @@ export default function HomeScreen() {
                         >
                           {station.name}
                         </Text>
-                        {status === 'current' && <Text style={styles.youAreHere}>YOU ARE HERE</Text>}
+                        {status === 'current' && (
+                          <Text style={[styles.youAreHere, { color: row.dotColor }]}>
+                            YOU ARE HERE
+                          </Text>
+                        )}
                         {status === 'transfer' && (
                           <View style={[styles.destBadge, { borderColor: row.dotColor }]}>
                             <Text style={[styles.destBadgeText, { color: row.dotColor }]}>
@@ -422,14 +478,18 @@ const makeStyles = (t: Theme) =>
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
+    gap: spacing.md,
   },
   heroLabel: {
+    flexShrink: 0,
     fontFamily: fonts.bold,
     fontSize: fontSize.sm,
     color: t.textMuted,
     letterSpacing: 1.8,
   },
   heroLineLabel: {
+    flexShrink: 1,
+    textAlign: 'right',
     fontFamily: fonts.bold,
     fontSize: fontSize.sm,
     color: t.textMuted,
@@ -552,6 +612,13 @@ const makeStyles = (t: Theme) =>
     width: 2,
     backgroundColor: t.border,
   },
+  flowArrow: {
+    position: 'absolute',
+    left: RAIL_LINE_LEFT - 6,
+    top: '50%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   railDotWrap: {
     position: 'absolute',
     top: 0,
@@ -589,18 +656,20 @@ const makeStyles = (t: Theme) =>
     backgroundColor: t.bg,
     borderWidth: 2,
   },
+  // The "you are here" marker is tinted with the active line color (filled dot
+  // + a soft same-color glow). Colors are applied inline per-row.
   dotCurrentGlow: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(59,130,246,0.16)',
+    backgroundColor: withAlpha(t.accent, 0.18),
     alignItems: 'center',
     justifyContent: 'center',
   },
   dotCurrent: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
     backgroundColor: t.accent,
   },
   routeContent: {

@@ -48,6 +48,10 @@ export interface SettingsState {
   isTracking: boolean;
   hasLocationPermission: boolean;
   themePref: ThemePref;
+  // Custom accent (hex). null → the default brand blue from the active palette.
+  accentPref: string | null;
+  // Hidden dev tools, revealed by tapping the "tiba" wordmark repeatedly.
+  devUnlocked: boolean;
 }
 
 // ============================================================================
@@ -62,6 +66,8 @@ export interface TibaStore extends LocationState, TripState, SettingsState {
   setAlarmThreshold: (threshold: number) => void;
   setIsAlarmActive: (active: boolean) => void;
   setThemePref: (pref: ThemePref) => void;
+  setAccentPref: (hex: string | null) => void;
+  unlockDev: () => void;
 
   // Reset the active journey (destination + transient location/trip state) while
   // keeping user preferences like the alarm threshold. Used when an arrival
@@ -80,6 +86,7 @@ const MMKV_KEYS = {
   DESTINATION: 'tiba_destination',
   ALARM_THRESHOLD: 'tiba_alarm_threshold',
   THEME_PREF: 'tiba_theme_pref',
+  ACCENT_PREF: 'tiba_accent_pref',
 };
 
 // Transient location/settings state mutated directly via useTibaStore.setState()
@@ -115,6 +122,11 @@ export const useTibaStore = create<TibaStore>((set) => {
       initialState.themePref = savedThemePref;
     }
 
+    const savedAccentPref = storage.getString(MMKV_KEYS.ACCENT_PREF);
+    if (savedAccentPref) {
+      initialState.accentPref = savedAccentPref;
+    }
+
     return initialState;
   };
 
@@ -145,13 +157,28 @@ export const useTibaStore = create<TibaStore>((set) => {
     // ========================================================================
     isTracking: false,
     hasLocationPermission: false,
-    themePref: persistedState.themePref ?? 'system',
+    // Default to dark — the app's core "mono" design is dark. Light / system
+    // remain selectable in Settings; defaulting to system surprised users on
+    // light-mode devices with an all-white UI that read as a broken screen.
+    themePref: persistedState.themePref ?? 'dark',
+    accentPref: persistedState.accentPref ?? null,
+    devUnlocked: false,
 
     // ========================================================================
     // Trip Actions (with MMKV Persistence)
     // ========================================================================
     setDestination: (station) => {
-      set({ destination: station });
+      // Changing the destination invalidates any planned route / progress, so
+      // reset the trip-derived state. The next location update re-plans from the
+      // current position to the new destination.
+      set({
+        destination: station,
+        tripPlan: null,
+        currentLegIndex: 0,
+        stationsRemaining: null,
+        isAlarmActive: false,
+        alarmKind: null,
+      });
 
       if (station) {
         try {
@@ -190,6 +217,18 @@ export const useTibaStore = create<TibaStore>((set) => {
         console.warn('Failed to persist theme preference:', e);
       }
     },
+
+    setAccentPref: (hex) => {
+      set({ accentPref: hex });
+      try {
+        if (hex) storage.set(MMKV_KEYS.ACCENT_PREF, hex);
+        else storage.remove(MMKV_KEYS.ACCENT_PREF);
+      } catch (e) {
+        console.warn('Failed to persist accent preference:', e);
+      }
+    },
+
+    unlockDev: () => set({ devUnlocked: true }),
 
     resetTrip: () => {
       storage.remove(MMKV_KEYS.DESTINATION);

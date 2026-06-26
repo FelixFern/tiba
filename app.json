@@ -56,6 +56,13 @@
       ],
       "expo-audio",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#3B82F6"
+        }
+      ],
+      [
         "expo-widgets",
         {
           "frequentUpdates": true,
